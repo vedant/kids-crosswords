@@ -1,0 +1,17 @@
+{
+  "name": "kids-crosswords",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5185",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 5185",
+    "test": "node --test tests/crosswordLayout.test.js",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "vite": "^7.1.2"
+  }
+}

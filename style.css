@@ -1,0 +1,1338 @@
+@font-face {
+  font-family: 'BDCartoonShout';
+  src: url('/fonts/subset-BDCartoonShout.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'MyRoboto';
+  src: url('/fonts/Roboto-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg-purple-dark: #3f006a;
+  --bg-purple-mid: #7200d1;
+  --accent-blue: #29b1e9;
+  --accent-orange: #f69626;
+  --accent-pink: #e72878;
+  --accent-yellow: #ffd01e;
+  --accent-green: #22c55e;
+  --accent-teal: #00aba2;
+  --grid-blue: #0499d4;
+  --grid-text: #1e293b;
+  --card-white: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  min-height: 100vh;
+  width: 100%;
+  font-family: 'MyRoboto', Verdana, Geneva, Tahoma, sans-serif;
+  color: #ffffff;
+  background-color: var(--bg-purple-mid);
+  background-image: url('/skin/planetes1200.png'), url('/skin/starsBG.png'),
+    linear-gradient(to bottom, var(--bg-purple-dark) 0%, var(--bg-purple-mid) 100%);
+  background-repeat: no-repeat, repeat, no-repeat;
+  background-position: center top, center top, center top;
+  background-size: 100vw auto, auto auto, 100% 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.cartoon-font {
+  font-family: 'BDCartoonShout', 'Comic Sans MS', cursive, sans-serif;
+  letter-spacing: 1px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.hidden {
+  display: none !important;
+}
+
+#wrapper {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 12px 18px 60px;
+}
+
+/* Header */
+#site-header {
+  padding: 10px 0 18px;
+}
+
+.header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: rgba(24, 0, 48, 0.45);
+  border: 3px solid rgba(255, 255, 255, 0.28);
+  border-radius: 22px;
+  padding: 14px 22px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.brand-Area {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mascot-badge {
+  font-size: 40px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+  user-select: none;
+}
+
+.site-logo-title {
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1.15;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.logo-blue {
+  color: var(--accent-blue);
+}
+.logo-orange {
+  color: var(--accent-orange);
+}
+.logo-pink {
+  color: var(--accent-pink);
+}
+
+.site-tagline {
+  color: var(--accent-yellow);
+  font-size: 14px;
+  margin-top: 3px;
+  font-weight: 600;
+}
+
+.header-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-pill {
+  font-family: 'BDCartoonShout', Verdana, sans-serif;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(41, 177, 233, 0.85);
+  border: 2.5px solid #fff;
+  border-radius: 999px;
+  padding: 8px 15px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-pill:hover {
+  transform: translateY(-2px) scale(1.03);
+  background: var(--accent-pink);
+}
+
+.btn-pill.active {
+  background: var(--accent-orange);
+}
+
+/* Floating animations from template */
+@keyframes floatAnim {
+  0%,
+  100% {
+    transform: translateY(-4px) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(5px) rotate(4deg);
+  }
+}
+
+@keyframes floatAnim2 {
+  0%,
+  100% {
+    transform: translateY(4px) rotate(3deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(-4deg);
+  }
+}
+
+.floatAnim {
+  animation: floatAnim 4.5s ease-in-out infinite;
+}
+
+.floatAnim2 {
+  animation: floatAnim2 5s ease-in-out infinite;
+}
+
+/* Custom AI Theme Generator Card */
+.theme-generator-card {
+  background: linear-gradient(135deg, rgba(45, 5, 85, 0.88), rgba(88, 12, 158, 0.88));
+  border: 3px solid rgba(255, 255, 255, 0.45);
+  border-radius: 22px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+
+.generator-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.generator-header h2 {
+  font-size: clamp(18px, 2.2vw, 24px);
+  color: #fff;
+}
+
+.generator-badge {
+  background: var(--accent-yellow);
+  color: #3f006a;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.generator-form {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 12px;
+  align-items: end;
+}
+
+@media (max-width: 960px) {
+  .generator-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .theme-input-wrap {
+    grid-column: 1 / -1;
+  }
+  .generate-submit-btn {
+    grid-column: 1 / -1;
+  }
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.input-group label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-yellow);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.input-group input,
+.input-group select {
+  height: 46px;
+  border-radius: 12px;
+  border: 2.5px solid #fff;
+  background: #ffffff;
+  color: #1e1b4b;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 14px;
+  outline: none;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.input-group input:focus,
+.input-group select:focus {
+  border-color: var(--accent-yellow);
+  box-shadow: 0 0 0 3px rgba(255, 208, 30, 0.4);
+}
+
+.btn-cartoon {
+  font-family: 'BDCartoonShout', Verdana, sans-serif;
+  font-size: 16px;
+  color: #ffffff;
+  background-color: var(--accent-blue);
+  border: 3px solid #ffffff;
+  border-radius: 12px;
+  padding: 10px 20px;
+  height: 46px;
+  cursor: pointer;
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.45);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-cartoon.orange {
+  background-color: var(--accent-orange);
+}
+
+.btn-cartoon.fushia {
+  background-color: var(--accent-pink);
+}
+
+.btn-cartoon:hover:not(:disabled) {
+  transform: translateY(-2px) rotate(-1deg);
+  filter: brightness(1.08);
+}
+
+.btn-cartoon:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.quick-theme-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chips-label {
+  font-size: 13px;
+  color: var(--accent-yellow);
+  font-weight: 700;
+}
+
+.theme-chip {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theme-chip:hover {
+  background: var(--accent-orange);
+  border-color: #fff;
+  transform: translateY(-1px);
+}
+
+/* AI Loading Banner */
+.ai-loading-banner {
+  margin-top: 14px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 2px solid var(--accent-yellow);
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.spinner-orb {
+  width: 28px;
+  height: 28px;
+  border: 4px solid rgba(255, 255, 255, 0.25);
+  border-top-color: var(--accent-yellow);
+  border-right-color: var(--accent-pink);
+  border-radius: 50%;
+  animation: spinOrb 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spinOrb {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.loading-text-wrap strong {
+  color: var(--accent-yellow);
+}
+
+/* Main Puzzle Stage (Crosswords-for-Kids style bright board) */
+.puzzle-stage {
+  background: linear-gradient(180deg, #fdfefe 0%, #eef8ff 100%);
+  color: #1e293b;
+  border: 5px solid #ffffff;
+  border-radius: 26px;
+  padding: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  margin-bottom: 36px;
+}
+
+.stage-top-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 2px dashed #bae6fd;
+}
+
+.puzzle-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-pill {
+  display: inline-block;
+  align-self: flex-start;
+  background: var(--accent-blue);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
+  padding: 4px 11px;
+  border-radius: 999px;
+  letter-spacing: 0.5px;
+}
+
+.puzzle-title-block h2 {
+  color: #0369a1;
+  text-shadow: 1px 1px 0px #ffffff, 2px 2px 0px rgba(3, 105, 161, 0.18);
+  font-size: clamp(20px, 2.5vw, 28px);
+}
+
+.score-and-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-pill {
+  background: #fef3c7;
+  border: 2.5px solid #f59e0b;
+  color: #92400e;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 8px 14px;
+  border-radius: 12px;
+}
+
+.btn-action {
+  font-family: 'BDCartoonShout', Verdana, sans-serif;
+  font-size: 14px;
+  color: #ffffff;
+  border: 2.5px solid #ffffff;
+  border-radius: 11px;
+  padding: 8px 14px;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22);
+  transition: transform 0.12s ease;
+}
+
+.btn-action.blue {
+  background: var(--accent-blue);
+}
+.btn-action.orange {
+  background: var(--accent-orange);
+}
+.btn-action.purple {
+  background: #7c3aed;
+}
+
+.btn-action:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+}
+
+/* Active Clue Spotlight Banner */
+.active-clue-banner {
+  margin: 14px 0 18px;
+  background: linear-gradient(90deg, #e0f2fe 0%, #f0f9ff 60%, #fef9c3 100%);
+  border: 3px solid var(--grid-blue);
+  border-radius: 18px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 4px 12px rgba(4, 153, 212, 0.14);
+}
+
+.active-clue-num {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-pink);
+  color: #fff;
+  font-family: 'BDCartoonShout', sans-serif;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+.active-clue-thumb-wrap {
+  width: 68px;
+  height: 68px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 2.5px solid var(--grid-blue);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.active-clue-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.active-clue-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.spotlight-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.clue-mode-badge {
+  background: #0284c7;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.clue-mode-badge.question-mode {
+  background: #d97706;
+}
+
+.clue-dir-badge {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0369a1;
+}
+
+.spotlight-question {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.spotlight-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-nav-clue {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 2px solid var(--grid-blue);
+  background: #ffffff;
+  color: var(--grid-blue);
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.btn-nav-clue:hover {
+  background: var(--grid-blue);
+  color: #ffffff;
+}
+
+/* 3-Column Workspace: Left Clues + Center Grid + Right Clues */
+.board-workspace {
+  display: grid;
+  grid-template-columns: 270px 1fr 270px;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 1120px) {
+  .board-workspace {
+    grid-template-columns: 1fr;
+  }
+  .clues-column {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+.clues-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Individual Clue Cards (Picture or Question) */
+.clue-card {
+  position: relative;
+  background: #ffffff;
+  border: 3px solid #bae6fd;
+  border-radius: 18px;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.08);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  user-select: none;
+}
+
+.clue-card:hover {
+  transform: translateY(-2px) scale(1.01);
+  border-color: var(--accent-blue);
+  box-shadow: 0 8px 18px rgba(41, 177, 233, 0.2);
+}
+
+.clue-card.selected {
+  border-color: var(--accent-pink);
+  background: #fdf2f8;
+  box-shadow: 0 0 0 4px rgba(231, 40, 120, 0.22);
+}
+
+.clue-card.solved {
+  border-color: var(--accent-green);
+  background: #f0fdf4;
+}
+
+.clue-card.just-solved-pop {
+  animation: cluePopAnim 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes cluePopAnim {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.1) rotate(-2deg);
+  }
+  75% {
+    transform: scale(0.97) rotate(1deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.clue-number-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--grid-blue);
+  color: #ffffff;
+  font-family: 'BDCartoonShout', sans-serif;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 2.5px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+}
+
+.clue-card.selected .clue-number-badge {
+  background: var(--accent-pink);
+}
+
+.clue-card.solved .clue-number-badge {
+  background: var(--accent-green);
+}
+
+.clue-visual-box {
+  width: 82px;
+  height: 82px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.clue-visual-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 0.2s ease;
+}
+
+.clue-card:hover .clue-visual-box img {
+  transform: scale(1.06);
+}
+
+.clue-question-icon-box {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 2px solid #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.clue-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.clue-card-tag {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #0284c7;
+}
+
+.clue-card-tag.is-question {
+  color: #d97706;
+}
+
+.clue-text {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.3;
+}
+
+.clue-word-slots {
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 1.5px;
+}
+
+.clue-card.solved .clue-word-slots {
+  color: #15803d;
+}
+
+.solved-check-stamp {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--accent-green);
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 15px;
+  font-weight: 900;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 2.5px solid #fff;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.22);
+}
+
+.clue-card.solved .solved-check-stamp {
+  display: flex;
+}
+
+/* Crossword Grid Center */
+.grid-center-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.crossword-grid-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+}
+
+.crossword-grid {
+  display: grid;
+  gap: 3px;
+  background: transparent;
+  padding: 6px;
+  user-select: none;
+}
+
+.xw-cell {
+  width: var(--cell-size, 46px);
+  height: var(--cell-size, 46px);
+  position: relative;
+  border-radius: 8px;
+}
+
+.xw-cell.empty {
+  background: transparent;
+  pointer-events: none;
+}
+
+.xw-cell.letter-cell {
+  background: #ffffff;
+  border: 2.5px solid var(--grid-blue);
+  box-shadow: 0 2px 5px rgba(4, 153, 212, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease, background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.xw-cell.letter-cell.in-active-word {
+  background: #e0f2fe;
+  border-color: #0284c7;
+}
+
+.xw-cell.letter-cell.focused {
+  background: #fef08a;
+  border-color: var(--accent-pink);
+  border-width: 3px;
+  transform: scale(1.06);
+  z-index: 4;
+  box-shadow: 0 4px 12px rgba(231, 40, 120, 0.3);
+}
+
+.xw-cell.letter-cell.word-solved {
+  background: #dcfce7;
+  border-color: #16a34a;
+}
+
+.xw-cell.letter-cell.word-solved .cell-char {
+  color: #15803d;
+}
+
+.xw-cell.letter-cell.cell-wrong {
+  background: #fee2e2;
+  border-color: #ef4444;
+  animation: wrongShake 0.35s ease;
+}
+
+.xw-cell.letter-cell.cell-wrong .cell-char {
+  color: #dc2626;
+}
+
+.xw-cell.letter-cell.cell-celebrate {
+  animation: cellStarPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes cellStarPop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.22) rotate(4deg);
+    background: #fef08a;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes wrongShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.cell-char {
+  font-family: 'BDCartoonShout', Verdana, sans-serif;
+  font-size: calc(var(--cell-size, 46px) * 0.52);
+  color: #0369a1;
+  line-height: 1;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.cell-char.is-hint-letter {
+  opacity: 0.85;
+}
+
+/* Word Start Number Bubbles on the Grid (Crosswords-for-Kids style) */
+.cell-num-badges {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  display: flex;
+  gap: 2px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.cell-num-bubble {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--grid-blue);
+  border: 2px solid var(--grid-blue);
+  font-family: 'BDCartoonShout', sans-serif;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Kid-Friendly On-Screen Keyboard */
+.virtual-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 560px;
+  background: #e0f2fe;
+  border: 2.5px solid #7dd3fc;
+  border-radius: 18px;
+  padding: 10px;
+}
+
+.vk-row {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.vk-key {
+  flex: 1;
+  min-width: 28px;
+  max-width: 46px;
+  height: 40px;
+  border-radius: 9px;
+  border: 2px solid #0284c7;
+  background: #ffffff;
+  color: #0369a1;
+  font-family: 'BDCartoonShout', Verdana, sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #0284c7;
+  transition: transform 0.08s ease, background-color 0.1s ease;
+}
+
+.vk-key:hover {
+  background: #fef08a;
+  transform: translateY(-1px);
+}
+
+.vk-key:active {
+  transform: translateY(1px);
+}
+
+.vk-key.vk-wide {
+  max-width: 82px;
+  font-size: 12px;
+  background: #fed7aa;
+  border-color: #ea580c;
+  color: #9a3412;
+  box-shadow: 0 2px 0 #ea580c;
+}
+
+/* Per-clue "YAAAY! ⭐" Toast & Sparkle Particles */
+#clue-cheer-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1200;
+  overflow: hidden;
+}
+
+.clue-yay-toast {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, #f69626, #e72878);
+  color: #ffffff;
+  border: 3.5px solid #ffffff;
+  border-radius: 999px;
+  padding: 10px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+  animation: yayFloatUp 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.yay-main {
+  font-family: 'BDCartoonShout', cursive, sans-serif;
+  font-size: 22px;
+  letter-spacing: 1px;
+  text-shadow: 2px 2px 3px rgba(0, 0, 0, 0.5);
+}
+
+.yay-word {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent-yellow);
+  letter-spacing: 2px;
+}
+
+@keyframes yayFloatUp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -20%) scale(0.5);
+  }
+  22% {
+    opacity: 1;
+    transform: translate(-50%, -65%) scale(1.12);
+  }
+  40% {
+    transform: translate(-50%, -75%) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -110%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -135%) scale(0.85);
+  }
+}
+
+.clue-sparkle-particle {
+  position: fixed;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  pointer-events: none;
+  animation: sparkleBurst 0.9s ease-out forwards;
+}
+
+@keyframes sparkleBurst {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2);
+  }
+}
+
+/* Grand Victory Overlay & Fireworks Modal */
+.victory-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(25, 0, 50, 0.82);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+#victory-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.victory-card {
+  position: relative;
+  z-index: 2;
+  background: linear-gradient(180deg, #4c1d95 0%, #2e1065 100%);
+  border: 5px solid #ffd01e;
+  border-radius: 30px;
+  padding: 32px 28px;
+  max-width: 540px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75), 0 0 40px rgba(255, 208, 30, 0.45);
+  animation: victoryCardEntrance 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes victoryCardEntrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.55) rotate(-5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.victory-trophy-bounce {
+  font-size: 76px;
+  line-height: 1;
+  margin-bottom: 8px;
+  animation: trophyBounce 1.1s ease-in-out infinite;
+}
+
+@keyframes trophyBounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-14px) scale(1.12);
+  }
+}
+
+.victory-stars-row {
+  font-size: 26px;
+  letter-spacing: 6px;
+  margin-bottom: 10px;
+}
+
+.victory-heading {
+  font-size: clamp(24px, 4vw, 34px);
+  color: var(--accent-yellow);
+  margin-bottom: 8px;
+}
+
+.victory-subtitle {
+  font-size: 17px;
+  color: #ffffff;
+  margin-bottom: 18px;
+}
+
+.victory-word-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.victory-word-pill {
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid #ffd01e;
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+
+.victory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Featured Tilted Cards Gallery (Crosswords-for-Kids.com template aesthetic) */
+.themes-gallery-section {
+  margin-top: 10px;
+  margin-bottom: 40px;
+}
+
+.section-heading {
+  font-size: clamp(20px, 2.6vw, 28px);
+  margin-bottom: 6px;
+}
+
+.section-sub {
+  color: var(--accent-yellow);
+  font-size: 15px;
+  margin-bottom: 18px;
+}
+
+div.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 24px;
+  padding: 10px 4px;
+}
+
+div.list div.element {
+  background: #ffffff;
+  color: var(--accent-blue);
+  border-radius: 14px;
+  padding: 14px;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+div.list div.element:nth-child(even) {
+  transform: rotate(-1.2deg);
+}
+
+div.list div.element:nth-child(odd) {
+  transform: rotate(1.2deg);
+}
+
+div.list div.element:hover:nth-child(even) {
+  transform: rotate(1.2deg) translateY(-4px);
+}
+
+div.list div.element:hover:nth-child(odd) {
+  transform: rotate(-1.2deg) translateY(-4px);
+}
+
+div.list div.element.orange:hover {
+  background-color: var(--accent-orange);
+  color: #ffffff;
+}
+
+div.list div.element.fushia:hover {
+  background-color: var(--accent-pink);
+  color: #ffffff;
+}
+
+.card-badge-ribbon {
+  position: absolute;
+  top: -12px;
+  right: 12px;
+  background: var(--accent-pink);
+  color: #fff;
+  font-family: 'BDCartoonShout', sans-serif;
+  font-size: 11px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.card-preview-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: #f0f9ff;
+  border-radius: 10px;
+  padding: 8px;
+  height: 96px;
+}
+
+.card-preview-strip img {
+  width: 100%;
+  height: 80px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.card-title {
+  font-family: 'BDCartoonShout', sans-serif;
+  font-size: 17px;
+  color: inherit;
+  text-shadow: none;
+}
+
+.card-infos {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+div.list div.element:hover .card-infos {
+  color: #ffffff;
+}
+
+/* How to Play Section */
+.howplay-section {
+  margin-top: 20px;
+}
+
+.howplay-section h2 {
+  margin-bottom: 16px;
+}
+
+.howplay-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.howplay-grid li {
+  background: rgba(0, 0, 0, 0.26);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  padding: 18px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #ffffff;
+}
+
+span.number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-right: 8px;
+  background: var(--accent-blue);
+  color: #fff;
+  font-family: 'BDCartoonShout', sans-serif;
+  font-size: 15px;
+  border-radius: 50%;
+}
+
+span.number.orange {
+  background: var(--accent-orange);
+}
+span.number.fushia {
+  background: var(--accent-pink);
+}
+span.number.vert {
+  background: var(--accent-teal);
+}
+
+.site-footer {
+  margin-top: 40px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+}
