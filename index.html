@@ -31,7 +31,7 @@
         <h2 id="victory-title" class="victory-heading">YAAAY! PUZZLE SOLVED!</h2>
         <p id="victory-subtitle" class="victory-subtitle">You found every single word!</p>
         <div id="victory-word-pills" class="victory-word-pills"></div>
-        <div class="victory-actions">
+        <div id="victory-actions">
           <button id="btn-victory-replay" class="btn-cartoon orange" type="button">🔄 Play Again</button>
           <button id="btn-victory-new-theme" class="btn-cartoon fushia" type="button">✨ New Theme Puzzle</button>
         </div>
@@ -59,7 +59,7 @@
             <button id="btn-sound-toggle" class="btn-pill" type="button" title="Toggle Sound Effects">
               🔊 Sound: ON
             </button>
-            <button id="btn-first-letter-toggle" class="btn-pill active" type="button" title="Reveal first letter of each word (Kid Helper)">
+            <button id="btn-first-letter-toggle" class="btn-pill active" type="button" title="Reveal first letter of each word (Helper)">
               🔤 First Letter: ON
             </button>
             <button id="btn-Browse-themes" class="btn-pill" type="button">
@@ -75,7 +75,7 @@
           <div class="generator-header">
             <div class="generator-title-row">
               <h2>✨ Create Any Crossword Theme!</h2>
-              <span class="generator-badge">5–10 Clues • AI Pictures + Questions</span>
+              <span class="generator-badge">Elementary to College • AI Pictures + Clues</span>
             </div>
             <button id="btn-toggle-generator" class="btn-toggle-generator" type="button" aria-expanded="true">
               🪄 Custom AI Theme ▾
@@ -89,10 +89,20 @@
                 <input
                   id="theme-input"
                   type="text"
-                  placeholder="e.g. Baby Animals, Construction Trucks, Superheroes, Ice Cream..."
+                  placeholder="e.g. Baby Animals, Ancient Rome, Astrophysics, Molecular Biology..."
                   required
                   maxlength="80"
                 />
+              </div>
+
+              <div class="input-group small-select">
+                <label for="difficulty-select">Difficulty Level</label>
+                <select id="difficulty-select">
+                  <option value="elementary" selected>🌱 Elementary (Default)</option>
+                  <option value="middle">📘 Middle School</option>
+                  <option value="high">🎓 High School (AP / SAT)</option>
+                  <option value="college">🏛️ College / Expert</option>
+                </select>
               </div>
 
               <div class="input-group small-select">
@@ -110,9 +120,9 @@
               <div class="input-group small-select">
                 <label for="clue-style-select">Clue Style</label>
                 <select id="clue-style-select">
-                  <option value="mixed" selected>🖼️ + ❓ Mix (AI Pictures &amp; Questions)</option>
-                  <option value="images">🖼️ Picture Clues Only (AI Generated)</option>
-                  <option value="questions">❓ Question / Riddle Clues Only</option>
+                  <option value="mixed" selected>🖼️ + ❓ Mix (Pictures &amp; Clues)</option>
+                  <option value="images">🖼️ Picture Clues Only</option>
+                  <option value="questions">❓ Text Clues Only</option>
                 </select>
               </div>
 
@@ -128,8 +138,8 @@
               <button type="button" class="theme-chip" data-quick-theme="Jungle Safari Animals">🦁 Jungle Safari</button>
               <button type="button" class="theme-chip" data-quick-theme="Yummy Fruits & Treats">🍓 Yummy Fruits</button>
               <button type="button" class="theme-chip" data-quick-theme="Musical Instruments">🎸 Musical Instruments</button>
-              <button type="button" class="theme-chip" data-quick-theme="Bugs & Garden Insects">🐞 Bugs &amp; Insects</button>
-              <button type="button" class="theme-chip" data-quick-theme="Fairy Tale Kingdom">🏰 Fairy Tale Kingdom</button>
+              <button type="button" class="theme-chip" data-quick-theme="Greek Mythology">⚡ Greek Mythology</button>
+              <button type="button" class="theme-chip" data-quick-theme="Quantum Physics & Cosmology" data-quick-difficulty="college">🌌 Quantum Physics (College)</button>
             </div>
           </div>
 
@@ -138,7 +148,7 @@
             <div class="spinner-orb"></div>
             <div class="loading-text-wrap">
               <strong id="ai-loading-title">Crafting your custom crossword...</strong>
-              <span id="ai-loading-detail">Generating kid-friendly words and AI illustrations...</span>
+              <span id="ai-loading-detail">Generating interconnected words and AI illustrations...</span>
             </div>
           </div>
         </section>
@@ -150,7 +160,7 @@
 
           <div class="stage-top-bar">
             <div class="puzzle-title-block">
-              <span id="active-theme-pill" class="theme-pill">Theme: Baby Animals</span>
+              <span id="active-theme-pill" class="theme-pill">Theme: Baby Animals • 🌱 Elementary</span>
               <h2 id="active-puzzle-title">Baby Animals Crossword</h2>
             </div>
 
@@ -218,7 +228,7 @@
         <section id="themes-gallery-section" class="themes-gallery-section">
           <h2 class="section-heading">🌟 Featured Picture &amp; Question Crosswords</h2>
           <p class="section-sub">
-            Tap any themed card below to play right away, or type your own theme above to generate a brand-new AI puzzle!
+            Tap any themed card below to play right away, or type your own theme above (from Elementary to College level) to generate a brand-new AI puzzle!
           </p>
           <div id="preset-cards-list" class="list"></div>
         </section>
@@ -241,7 +251,7 @@
             </li>
             <li>
               <span class="number vert">4</span>
-              Want a custom topic? Open <strong>Custom AI Theme</strong> at the top and AI will create 5–10 fresh clues and illustrations!
+              Choose your <strong>Difficulty Level</strong> (Elementary, Middle School, High School, or College) and type <strong>any topic</strong> in the generator box above!
             </li>
           </ul>
         </section>

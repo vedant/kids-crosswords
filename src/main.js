@@ -1,7 +1,8 @@
 /**
  * Main Application Controller for Crosswords for Kids
- * - Renders crossword grids (5-10 clues) with Crosswords-for-Kids.com styling
- * - Supports both AI-generated Picture Clues and Question/Riddle Clues
+ * - Renders 100% connected crossword grids (5-10 clues) with Crosswords-for-Kids.com styling
+ * - Supports 4 difficulty levels: Elementary (default), Middle School, High School, and College
+ * - Supports both AI-generated Picture Clues and Question/Riddle Clues with spoiler-free validation
  * - Allows user-specified custom themes with real-time Gemini Flash-Lite AI word/clue & image generation
  * - Plays "Yaaay!" sound effects + minimal sparkle animation on each solved clue
  * - Plays grand victory fanfare + full-screen fireworks/confetti animation on solving the puzzle
@@ -14,6 +15,7 @@ import {
   generateThemedPuzzleItems,
   generatePuzzleIllustrations,
   createFallbackStickerDataUrl,
+  getDifficultyProfile,
 } from './geminiGenerator.js';
 import {
   soundFx,
@@ -55,6 +57,7 @@ const els = {
   generatorCollapsibleBody: document.getElementById('generator-collapsible-body'),
   themeForm: document.getElementById('theme-generator-form'),
   themeInput: document.getElementById('theme-input'),
+  difficultySelect: document.getElementById('difficulty-select'),
   clueCountSelect: document.getElementById('clue-count-select'),
   clueStyleSelect: document.getElementById('clue-style-select'),
   generateBtn: document.getElementById('btn-generate-theme'),
@@ -155,6 +158,16 @@ function toggleMobileGenerator(forceOpen) {
   syncMobileGeneratorCollapseState();
 }
 
+function setFirstLetterHintState(enabled) {
+  state.revealFirstLetter = Boolean(enabled);
+  if (els.firstLetterToggleBtn) {
+    els.firstLetterToggleBtn.textContent = state.revealFirstLetter
+      ? '🔤 First Letter: ON'
+      : '🔤 First Letter: OFF';
+    els.firstLetterToggleBtn.classList.toggle('active', state.revealFirstLetter);
+  }
+}
+
 function openImageZoom(imgUrl, captionText) {
   if (!imgUrl || !els.imageZoomOverlay) return;
   els.zoomModalImg.src = imgUrl;
@@ -175,11 +188,7 @@ function bindEvents() {
   });
 
   els.firstLetterToggleBtn.addEventListener('click', () => {
-    state.revealFirstLetter = !state.revealFirstLetter;
-    els.firstLetterToggleBtn.textContent = state.revealFirstLetter
-      ? '🔤 First Letter: ON'
-      : '🔤 First Letter: OFF';
-    els.firstLetterToggleBtn.classList.toggle('active', state.revealFirstLetter);
+    setFirstLetterHintState(!state.revealFirstLetter);
     if (state.currentPuzzleMeta) {
       resetCurrentPuzzle();
     }
@@ -205,8 +214,12 @@ function bindEvents() {
   document.querySelectorAll('[data-quick-theme]').forEach((chip) => {
     chip.addEventListener('click', async () => {
       const theme = chip.getAttribute('data-quick-theme');
+      const quickDiff = chip.getAttribute('data-quick-difficulty');
       if (!theme || state.isGenerating) return;
       els.themeInput.value = theme;
+      if (quickDiff && els.difficultySelect) {
+        els.difficultySelect.value = quickDiff;
+      }
       await handleGenerateCustomTheme(theme);
     });
   });
@@ -252,7 +265,8 @@ function bindEvents() {
 }
 
 /**
- * Loads a puzzle object ({ id, title, theme, items }) and builds the crossword layout.
+ * Loads a puzzle object ({ id, title, theme, difficultyLevel?, targetClueCount?, items })
+ * and builds the connected crossword layout.
  * IMPORTANT: Renders the new board DOM BEFORE selecting/highlighting cells so that
  * switching from a larger grid to a smaller grid never indexes stale DOM coordinates!
  */
@@ -261,7 +275,8 @@ export function loadPuzzle(puzzleMeta) {
   closeImageZoom();
 
   state.currentPuzzleMeta = JSON.parse(JSON.stringify(puzzleMeta));
-  state.layout = buildCrosswordLayout(state.currentPuzzleMeta.items, 10);
+  const targetCount = state.currentPuzzleMeta.targetClueCount || 10;
+  state.layout = buildCrosswordLayout(state.currentPuzzleMeta.items, targetCount);
   state.solvedWordIds.clear();
   state.wrongCells.clear();
   state.activeWordId = null;
@@ -272,14 +287,15 @@ export function loadPuzzle(puzzleMeta) {
     Array.from({ length: state.layout.cols }, () => '')
   );
 
-  // If revealFirstLetter is enabled (like Crosswords-for-Kids default), pre-populate the first letter of each word
+  // If revealFirstLetter is enabled, pre-populate the first letter of each word
   if (state.revealFirstLetter) {
     for (const w of state.layout.words) {
       state.userGrid[w.row][w.col] = w.word[0];
     }
   }
 
-  els.activeThemePill.textContent = `Theme: ${state.currentPuzzleMeta.theme}`;
+  const diffProfile = getDifficultyProfile(state.currentPuzzleMeta.difficultyLevel || 'elementary');
+  els.activeThemePill.textContent = `Theme: ${state.currentPuzzleMeta.theme} • ${diffProfile.badge}`;
   els.activePuzzleTitle.textContent = state.currentPuzzleMeta.title;
   els.totalWordCount.textContent = String(state.layout.words.length);
   els.solvedCount.textContent = '0';
@@ -307,18 +323,25 @@ async function handleGenerateCustomTheme(theme) {
   const runId = ++state.generationRunId;
   state.isGenerating = true;
   els.generateBtn.disabled = true;
-  els.loadingBanner.classList.remove('hidden');
-  els.loadingTitle.textContent = `Designing "${theme}" Crossword...`;
-  els.loadingDetail.textContent = 'Asking Gemini Flash-Lite for kid-friendly words, riddles & picture prompts...';
 
+  const difficulty = els.difficultySelect?.value || 'elementary';
+  const diffProfile = getDifficultyProfile(difficulty);
   const clueCount = Number(els.clueCountSelect.value) || 7;
   const clueStyle = els.clueStyleSelect.value || 'mixed';
 
+  els.loadingBanner.classList.remove('hidden');
+  els.loadingTitle.textContent = `Designing "${theme}" (${diffProfile.label}) Crossword...`;
+  els.loadingDetail.textContent = `Asking Gemini Flash-Lite for interconnected ${diffProfile.label.toLowerCase()} vocabulary & clues...`;
+
   try {
-    const items = await generateThemedPuzzleItems(theme, { clueCount, clueStyle });
+    const items = await generateThemedPuzzleItems(theme, {
+      clueCount,
+      clueStyle,
+      difficulty,
+    });
     if (runId !== state.generationRunId) return;
 
-    // Prepare temporary placeholder stickers while AI images stream in
+    // Prepare temporary spoiler-free placeholder stickers while AI images stream in
     items.forEach((item) => {
       if (item.clueType !== 'question' && !item.imageUrl) {
         item.imageUrl = createFallbackStickerDataUrl(item);
@@ -326,10 +349,15 @@ async function handleGenerateCustomTheme(theme) {
       }
     });
 
+    // Adjust First Letter Hint default based on difficulty level (Elementary/Middle -> ON, High/College -> OFF)
+    setFirstLetterHintState(diffProfile.revealFirstLetterDefault);
+
     const customPuzzle = {
       id: `custom-${Date.now()}`,
       title: `${theme} Crossword`,
       theme,
+      difficultyLevel: difficulty,
+      targetClueCount: clueCount,
       items,
     };
 
@@ -338,11 +366,11 @@ async function handleGenerateCustomTheme(theme) {
       toggleMobileGenerator(false);
     }
 
-    // Render the playable crossword immediately so the kid can start right away
+    // Render the playable crossword immediately so the player can start right away
     loadPuzzle(customPuzzle);
     document.getElementById('puzzle-stage')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    // Now generate the AI cartoon illustrations for the picture clues!
+    // Now generate the AI cartoon illustrations for the placed picture clues!
     const itemsToIllustrate = state.layout.words.filter((w) => w.clueType !== 'question');
     if (itemsToIllustrate.length > 0) {
       els.loadingTitle.textContent = `Painting AI Illustrations for "${theme}"...`;
@@ -456,12 +484,12 @@ function updateGridCellSize() {
   const gridPadding = 12;
   const maxAvailableCellWidth = Math.floor((wrapperWidth - gridPadding - (cols - 1) * gap) / cols);
 
-  let desktopIdeal = maxDim > 11 ? 38 : maxDim > 9 ? 44 : 50;
+  let desktopIdeal = maxDim > 13 ? 34 : maxDim > 11 ? 38 : maxDim > 9 ? 44 : 50;
   if (window.innerWidth <= 600) {
     desktopIdeal = maxDim > 10 ? 34 : maxDim > 8 ? 38 : 42;
   }
 
-  const cellSize = Math.max(24, Math.min(desktopIdeal, maxAvailableCellWidth));
+  const cellSize = Math.max(20, Math.min(desktopIdeal, maxAvailableCellWidth));
   els.crosswordGrid.style.setProperty('--cell-size', `${cellSize}px`);
   els.crosswordGrid.style.setProperty('--grid-gap', `${gap}px`);
   els.crosswordGrid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
@@ -590,7 +618,6 @@ function createClueCardElement(wordObj) {
   `;
 
   card.addEventListener('click', (e) => {
-    // If clicking the image on an already-selected card on mobile, allow quick zoom
     if (
       state.activeWordId === wordObj.id &&
       e.target.tagName === 'IMG' &&
@@ -809,7 +836,7 @@ function evaluateSolvedWords(triggerCelebrations = true) {
         triggerPuzzleVictory();
       }, 550);
     } else {
-      // Auto-advance to the next unsolved word for smooth kid gameplay
+      // Auto-advance to the next unsolved word for smooth gameplay
       const nextUnsolved = state.layout.words.find((w) => !state.solvedWordIds.has(w.id));
       if (nextUnsolved) {
         selectWord(nextUnsolved.id, false);

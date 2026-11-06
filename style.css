@@ -254,19 +254,28 @@ h3,
 
 .generator-form {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr auto auto auto auto;
   gap: 12px;
   align-items: end;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1120px) {
   .generator-form {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
   }
   .theme-input-wrap {
     grid-column: 1 / -1;
   }
   .generate-submit-btn {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .generator-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .generator-form .small-select:last-of-type {
     grid-column: 1 / -1;
   }
 }

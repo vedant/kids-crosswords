@@ -1,7 +1,8 @@
 /**
- * Crossword Grid Layout Engine for Kids Crosswords
- * Places 5-10 words into a compact, well-connected crossword grid.
- * Follows standard crossword rules:
+ * Crossword Grid Layout Engine
+ * Places 5-10 words into a compact, 100% connected crossword grid.
+ * Follows strict standard crossword rules:
+ * - Every word after the first MUST intersect the connected crossword component (no disconnected islands!)
  * - Words only intersect at matching letters (perpendicularly)
  * - No adjacent parallel words touching side-by-side without a valid crossing
  * - Cell before word start and after word end must be empty
@@ -15,8 +16,9 @@ export function sanitizeWord(raw) {
 }
 
 /**
- * Generates an optimal crossword layout from a list of clue items.
- * Each item: { word, questionClue, imagePrompt, imageUrl?, clueType? }
+ * Generates an optimal, connected crossword layout from a list of candidate clue items.
+ * Accepts extra candidate items (e.g. targetCount + 5) and selects up to `maxWords` items
+ * that form a single connected crossword grid.
  */
 export function buildCrosswordLayout(rawItems, maxWords = 10) {
   const seen = new Set();
@@ -24,60 +26,120 @@ export function buildCrosswordLayout(rawItems, maxWords = 10) {
 
   for (const item of rawItems || []) {
     const clean = sanitizeWord(item.word);
-    if (clean.length >= 2 && clean.length <= 12 && !seen.has(clean)) {
+    if (clean.length >= 2 && clean.length <= 15 && !seen.has(clean)) {
       seen.add(clean);
       validItems.push({
         ...item,
         word: clean,
       });
     }
-    if (validItems.length >= maxWords) break;
   }
 
   if (validItems.length === 0) {
     return { rows: 5, cols: 5, words: [], cells: [] };
   }
 
-  // Try multiple deterministic orderings to find the most connected, compact layout
+  const targetCount = Math.min(maxWords, validItems.length);
+
+  // Build diverse candidate orderings so we always find a 100% connected layout
+  const byLengthDesc = [...validItems].sort((a, b) => b.word.length - a.word.length);
+  const byBridgeScore = [...validItems].sort(
+    (a, b) => scoreMutualConnectivity(b.word, validItems) - scoreMutualConnectivity(a.word, validItems)
+  );
+  const byVowelScore = [...validItems].sort(
+    (a, b) => scoreLetterCommonality(b.word) - scoreLetterCommonality(a.word)
+  );
+
   const orderings = [
-    [...validItems].sort((a, b) => b.word.length - a.word.length),
-    [...validItems].sort((a, b) => scoreLetterCommonality(b.word) - scoreLetterCommonality(a.word)),
+    byBridgeScore,
+    byLengthDesc,
+    byVowelScore,
     [...validItems],
+    [...byBridgeScore].reverse(),
   ];
+
+  // Also try starting with each candidate word as the root anchor word
+  for (let i = 0; i < validItems.length; i++) {
+    const rest = validItems.filter((_, idx) => idx !== i);
+    rest.sort(
+      (a, b) => scoreMutualConnectivity(b.word, validItems) - scoreMutualConnectivity(a.word, validItems)
+    );
+    orderings.push([validItems[i], ...rest]);
+  }
+
+  // Deterministic pseudo-random shuffles for extra search breadth on tricky word sets
+  let seed = 1337;
+  const nextRand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+  for (let s = 0; s < 12; s++) {
+    const arr = [...validItems];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(nextRand() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    orderings.push(arr);
+  }
 
   let bestAttempt = null;
 
   for (const ordered of orderings) {
-    for (let startDir of ['across', 'down']) {
-      const attempt = attemptPlacement(ordered, startDir);
-      if (
-        !bestAttempt ||
-        attempt.placed.length > bestAttempt.placed.length ||
-        (attempt.placed.length === bestAttempt.placed.length &&
-          attempt.intersections > bestAttempt.intersections) ||
-        (attempt.placed.length === bestAttempt.placed.length &&
-          attempt.intersections === bestAttempt.intersections &&
-          attempt.area < bestAttempt.area)
-      ) {
+    for (const startDir of ['across', 'down']) {
+      const attempt = attemptPlacement(ordered, startDir, targetCount);
+      if (isBetterAttempt(attempt, bestAttempt)) {
         bestAttempt = attempt;
       }
     }
+    // Early exit if we found a well-connected full layout
+    if (
+      bestAttempt &&
+      bestAttempt.placed.length === targetCount &&
+      bestAttempt.intersections >= targetCount
+    ) {
+      break;
+    }
   }
 
-  return finalizeGrid(bestAttempt.placed, validItems);
+  return finalizeGrid(bestAttempt.placed);
+}
+
+function isBetterAttempt(candidate, currentBest) {
+  if (!currentBest) return true;
+  if (candidate.placed.length !== currentBest.placed.length) {
+    return candidate.placed.length > currentBest.placed.length;
+  }
+  if (candidate.intersections !== currentBest.intersections) {
+    return candidate.intersections > currentBest.intersections;
+  }
+  return candidate.area < currentBest.area;
 }
 
 function scoreLetterCommonality(word) {
-  const vowels = new Set(['A', 'E', 'I', 'O', 'U', 'R', 'S', 'T', 'L', 'N']);
+  const bridges = new Set(['A', 'E', 'I', 'O', 'U', 'R', 'S', 'T', 'L', 'N', 'C', 'D']);
   let score = word.length * 2;
   for (const ch of word) {
-    if (vowels.has(ch)) score += 3;
+    if (bridges.has(ch)) score += 3;
   }
   return score;
 }
 
-function attemptPlacement(items, firstDir = 'across') {
-  // Sparse coordinate map: key "r,c" -> { char, across: wordId|null, down: wordId|null }
+function scoreMutualConnectivity(word, allItems) {
+  const freq = new Map();
+  for (const it of allItems) {
+    for (const ch of new Set(it.word)) {
+      freq.set(ch, (freq.get(ch) || 0) + 1);
+    }
+  }
+  let score = scoreLetterCommonality(word);
+  for (const ch of word) {
+    score += (freq.get(ch) || 0) * 4;
+  }
+  return score;
+}
+
+function attemptPlacement(items, firstDir = 'across', targetCount = 10) {
+  // Sparse coordinate map: key "r,c" -> { char, across: wordIdx|null, down: wordIdx|null }
   const board = new Map();
   const placed = [];
   let totalIntersections = 0;
@@ -175,9 +237,9 @@ function attemptPlacement(items, firstDir = 'across') {
   putWord(items[0], 0, 0, firstDir, 0);
   const remaining = items.slice(1);
 
-  // Iteratively place remaining words with highest intersection & compactness score
+  // Iteratively place remaining words that intersect the connected component
   let madeProgress = true;
-  while (madeProgress && remaining.length > 0) {
+  while (madeProgress && remaining.length > 0 && placed.length < targetCount) {
     madeProgress = false;
     let bestCandidate = null;
 
@@ -185,7 +247,7 @@ function attemptPlacement(items, firstDir = 'across') {
       const candidateItem = remaining[rIdx];
       const w = candidateItem.word;
 
-      // Find all possible intersection placements against already placed words
+      // Find all valid intersection placements against already placed words
       for (const p of placed) {
         const targetDir = p.direction === 'across' ? 'down' : 'across';
         const pDr = p.direction === 'down' ? 1 : 0;
@@ -205,10 +267,9 @@ function attemptPlacement(items, firstDir = 'across') {
             const ints = canPlace(w, startR, startC, targetDir);
             if (ints > 0) {
               const b = getBounds({ r: startR, c: startC, dir: targetDir, len: w.length });
-              // Keep grid reasonably sized for kids
-              if (b.width > 16 || b.height > 16) continue;
+              if (b.width > 22 || b.height > 22) continue;
               const aspectPenalty = Math.abs(b.width - b.height) * 4;
-              const score = ints * 100 - b.area - aspectPenalty;
+              const score = ints * 120 - b.area - aspectPenalty;
               if (!bestCandidate || score > bestCandidate.score) {
                 bestCandidate = {
                   rIdx,
@@ -240,16 +301,8 @@ function attemptPlacement(items, firstDir = 'across') {
     }
   }
 
-  // If any words could not intersect (rare), place them neatly nearby so no clue is dropped
-  for (const orphan of remaining) {
-    const b = getBounds();
-    const dir = b.width <= b.height ? 'across' : 'down';
-    const startR = dir === 'across' ? b.maxR + 2 : b.minR;
-    const startC = dir === 'across' ? b.minC : b.maxC + 2;
-    if (canPlace(orphan.word, startR, startC, dir) >= 0) {
-      putWord(orphan, startR, startC, dir, placed.length);
-    }
-  }
+  // NOTE: We intentionally NEVER place disconnected orphan words!
+  // Every word in `placed` is guaranteed to be part of a single connected crossword component.
 
   const finalBounds = getBounds();
   return {
@@ -289,7 +342,7 @@ function finalizeGrid(placedWords) {
   // Sort in reading order (top-to-bottom, left-to-right) and assign clue numbers 1..N
   normalizedWords.sort((a, b) => (a.row !== b.row ? a.row - b.row : a.col - b.col));
 
-  // Assign unique word numbers 1..N (like Crosswords-for-Kids where each word has its own number badge 1..N)
+  // Assign unique word numbers 1..N
   normalizedWords.forEach((w, idx) => {
     w.number = idx + 1;
     w.id = `word-${idx + 1}`;
