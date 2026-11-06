@@ -1,13 +1,14 @@
 /**
  * Gemini AI Generator for Kids Crosswords
  * - Generates 5-10 themed crossword words + question clues + image prompts
- * - Generates AI cartoon illustrations for image clues using Gemini Image model
+ * - Uses the backend's hardcoded cheapest Gemini Flash-Lite model (gemini-3.5-flash-lite)
+ * - Generates AI cartoon illustrations for image clues using Gemini Flash-Lite Image model (gemini-3.1-flash-lite-image)
  */
 
 const PROXY_URL = '/api/gemini';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const TEXT_MODEL = 'gemini-2.5-flash';
-const IMAGE_MODEL = 'gemini-2.5-flash-image';
+const TEXT_MODEL = 'gemini-3.5-flash-lite';
+const IMAGE_MODEL = 'gemini-3.1-flash-lite-image';
 
 export function getStoredApiKey() {
   try {
@@ -29,7 +30,7 @@ export function setStoredApiKey(key) {
   }
 }
 
-async function callGemini(model, payload) {
+async function callGemini(task, model, payload) {
   const userKey = getStoredApiKey();
   if (userKey) {
     const res = await fetch(`${GEMINI_API_BASE}/${model}:generateContent?key=${userKey}`, {
@@ -43,8 +44,33 @@ async function callGemini(model, payload) {
   return fetch(PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, payload }),
+    body: JSON.stringify({ task, model, payload }),
   });
+}
+
+function extractJsonArray(rawText) {
+  const cleaned = String(rawText || '')
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && Array.isArray(parsed.items)) return parsed.items;
+    if (parsed && Array.isArray(parsed.words)) return parsed.words;
+    if (parsed && Array.isArray(parsed.clues)) return parsed.clues;
+  } catch {
+    // Try extracting the first [...] block
+    const start = cleaned.indexOf('[');
+    const end = cleaned.lastIndexOf(']');
+    if (start !== -1 && end > start) {
+      const sub = cleaned.slice(start, end + 1);
+      const parsedSub = JSON.parse(sub);
+      if (Array.isArray(parsedSub)) return parsedSub;
+    }
+  }
+  return null;
 }
 
 /**
@@ -92,42 +118,46 @@ Output JSON schema:
     },
   };
 
-  const res = await callGemini(TEXT_MODEL, payload);
+  const res = await callGemini('text', TEXT_MODEL, payload);
   if (!res.ok) {
     const errText = await res.text();
     throw new Error(`AI theme generation failed (${res.status}): ${errText}`);
   }
 
   const data = await res.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  const textPart = parts.find((p) => typeof p.text === 'string' && p.text.trim()) || parts[0];
+  const rawText = textPart?.text;
   if (!rawText) {
     throw new Error('No puzzle data returned from AI model.');
   }
 
-  const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-  const parsed = JSON.parse(cleaned);
+  const parsed = extractJsonArray(rawText);
   if (!Array.isArray(parsed) || parsed.length === 0) {
     throw new Error('Invalid puzzle item list returned from AI.');
   }
 
-  return parsed.slice(0, clueCount).map((item, idx) => {
-    const word = String(item.word || '')
-      .toUpperCase()
-      .replace(/[^A-Z]/g, '');
-    let clueType = item.clueType;
-    if (clueStyle === 'images') clueType = 'image';
-    else if (clueStyle === 'questions') clueType = 'question';
-    else if (clueType !== 'image' && clueType !== 'question') {
-      clueType = idx % 2 === 0 ? 'image' : 'question';
-    }
-    return {
-      word,
-      questionClue: item.questionClue || `Can you spell this ${theme} word?`,
-      imagePrompt: item.imagePrompt || `A cute children's illustration of ${word.toLowerCase()}`,
-      clueType,
-      imageUrl: null,
-    };
-  });
+  return parsed
+    .map((item, idx) => {
+      const word = String(item.word || '')
+        .toUpperCase()
+        .replace(/[^A-Z]/g, '');
+      let clueType = item.clueType;
+      if (clueStyle === 'images') clueType = 'image';
+      else if (clueStyle === 'questions') clueType = 'question';
+      else if (clueType !== 'image' && clueType !== 'question') {
+        clueType = idx % 2 === 0 ? 'image' : 'question';
+      }
+      return {
+        word,
+        questionClue: item.questionClue || `Can you spell this ${theme} word?`,
+        imagePrompt: item.imagePrompt || `A cute children's illustration of ${word.toLowerCase()}`,
+        clueType,
+        imageUrl: null,
+      };
+    })
+    .filter((item) => item.word.length >= 2)
+    .slice(0, clueCount);
 }
 
 /**
@@ -146,7 +176,7 @@ export async function generateClueIllustration(item, theme = '') {
   };
 
   try {
-    const res = await callGemini(IMAGE_MODEL, payload);
+    const res = await callGemini('image', IMAGE_MODEL, payload);
     if (!res.ok) {
       throw new Error(`Image HTTP ${res.status}`);
     }
@@ -166,10 +196,10 @@ export async function generateClueIllustration(item, theme = '') {
 
 /**
  * Generates AI illustrations for all items that need an image (in parallel batches of 3)
- * Calls `onItemImage(word, imageUrl, doneCount, totalCount)` as each finishes.
+ * Calls `onProgress(item, imageUrl, doneCount, totalCount)` as each finishes.
  */
 export async function generatePuzzleIllustrations(items, theme, onProgress) {
-  const targets = items.filter((it) => !it.imageUrl);
+  const targets = items.filter((it) => it.clueType !== 'question' && (!it.imageUrl || it._needsAiImage));
   let completed = 0;
   const total = targets.length;
   const concurrency = 3;
@@ -180,6 +210,7 @@ export async function generatePuzzleIllustrations(items, theme, onProgress) {
       batch.map(async (item) => {
         const dataUrl = await generateClueIllustration(item, theme);
         item.imageUrl = dataUrl;
+        item._needsAiImage = false;
         completed++;
         if (onProgress) {
           onProgress(item, dataUrl, completed, total);
@@ -191,7 +222,7 @@ export async function generatePuzzleIllustrations(items, theme, onProgress) {
 }
 
 /**
- * Colorful SVG fallback sticker if offline or rate-limited
+ * Colorful SVG fallback sticker if offline or loading
  */
 export function createFallbackStickerDataUrl(item) {
   const text = (item.questionClue || item.word || '?').replace(/[<>&"']/g, '');

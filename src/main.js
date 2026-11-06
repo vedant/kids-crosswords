@@ -2,9 +2,10 @@
  * Main Application Controller for Crosswords for Kids
  * - Renders crossword grids (5-10 clues) with Crosswords-for-Kids.com styling
  * - Supports both AI-generated Picture Clues and Question/Riddle Clues
- * - Allows user-specified custom themes with real-time Gemini AI word/clue & image generation
+ * - Allows user-specified custom themes with real-time Gemini Flash-Lite AI word/clue & image generation
  * - Plays "Yaaay!" sound effects + minimal sparkle animation on each solved clue
  * - Plays grand victory fanfare + full-screen fireworks/confetti animation on solving the puzzle
+ * - Fully optimized for mobile phones and tablets (responsive grid sizing, 1-tap clue pills, tap-to-zoom pictures)
  */
 
 import { buildCrosswordLayout } from './crosswordLayout.js';
@@ -20,6 +21,15 @@ import {
   startGrandVictoryAnimation,
 } from './soundAndFx.js';
 
+const PRESET_ICONS = {
+  'baby-animals': '🐾',
+  'solar-system': '🪐',
+  dinosaurs: '🦖',
+  'sea-animals': '🐙',
+  'school-adventure': '🎒',
+  'pirate-treasure': '🏴‍☠️',
+};
+
 const state = {
   currentPuzzleMeta: null,
   layout: null,
@@ -31,6 +41,8 @@ const state = {
   revealFirstLetter: true,
   stopVictoryFn: null,
   isGenerating: false,
+  generationRunId: 0,
+  generatorCollapsedOnMobile: true,
 };
 
 // --- DOM Elements ---
@@ -38,6 +50,9 @@ const els = {
   soundToggleBtn: document.getElementById('btn-sound-toggle'),
   firstLetterToggleBtn: document.getElementById('btn-first-letter-toggle'),
   browseThemesBtn: document.getElementById('btn-Browse-themes'),
+  generatorCard: document.getElementById('theme-generator-card'),
+  toggleGeneratorBtn: document.getElementById('btn-toggle-generator'),
+  generatorCollapsibleBody: document.getElementById('generator-collapsible-body'),
   themeForm: document.getElementById('theme-generator-form'),
   themeInput: document.getElementById('theme-input'),
   clueCountSelect: document.getElementById('clue-count-select'),
@@ -46,6 +61,7 @@ const els = {
   loadingBanner: document.getElementById('ai-loading-banner'),
   loadingTitle: document.getElementById('ai-loading-title'),
   loadingDetail: document.getElementById('ai-loading-detail'),
+  quickPresetsStrip: document.getElementById('quick-presets-strip'),
   activeThemePill: document.getElementById('active-theme-pill'),
   activePuzzleTitle: document.getElementById('active-puzzle-title'),
   solvedCount: document.getElementById('solved-count'),
@@ -53,16 +69,19 @@ const els = {
   hintLetterBtn: document.getElementById('btn-hint-letter'),
   checkGridBtn: document.getElementById('btn-check-grid'),
   resetPuzzleBtn: document.getElementById('btn-reset-puzzle'),
+  clueJumpBar: document.getElementById('clue-jump-bar'),
   spotlightNumber: document.getElementById('spotlight-number'),
   spotlightThumbWrap: document.getElementById('spotlight-thumb-wrap'),
   spotlightImg: document.getElementById('spotlight-img'),
   spotlightTypeBadge: document.getElementById('spotlight-type-badge'),
   spotlightDirBadge: document.getElementById('spotlight-dir-badge'),
   spotlightQuestion: document.getElementById('spotlight-question'),
+  spotlightWordSlots: document.getElementById('spotlight-word-slots'),
   prevClueBtn: document.getElementById('btn-prev-clue'),
   nextClueBtn: document.getElementById('btn-next-clue'),
   cluesColLeft: document.getElementById('clues-col-left'),
   cluesColRight: document.getElementById('clues-col-right'),
+  crosswordGridWrapper: document.getElementById('crossword-grid-wrapper'),
   crosswordGrid: document.getElementById('crossword-grid'),
   virtualKeyboard: document.getElementById('virtual-keyboard'),
   presetCardsList: document.getElementById('preset-cards-list'),
@@ -73,11 +92,17 @@ const els = {
   victoryWordPills: document.getElementById('victory-word-pills'),
   victoryReplayBtn: document.getElementById('btn-victory-replay'),
   victoryNewThemeBtn: document.getElementById('btn-victory-new-theme'),
+  imageZoomOverlay: document.getElementById('image-zoom-overlay'),
+  zoomModalImg: document.getElementById('zoom-modal-img'),
+  zoomModalCaption: document.getElementById('zoom-modal-caption'),
+  closeZoomBtn: document.getElementById('btn-close-zoom'),
 };
 
 function initApp() {
   renderVirtualKeyboard();
+  renderQuickPresetsStrip();
   renderPresetGallery();
+  syncMobileGeneratorCollapseState();
   bindEvents();
 
   // Load default preset ("Baby Animals Crossword")
@@ -86,6 +111,10 @@ function initApp() {
   // Expose helper for automated testing & quick inspection
   window.__KIDS_XW__ = {
     getState: () => state,
+    loadPresetById: (id) => {
+      const found = PRESET_PUZZLES.find((p) => p.id === id);
+      if (found) loadPuzzle(found);
+    },
     solveCurrentWord: () => {
       const wordObj = getActiveWord();
       if (wordObj) fillWordSolution(wordObj);
@@ -100,6 +129,44 @@ function initApp() {
   };
 }
 
+function isMobileViewport() {
+  return window.innerWidth <= 768;
+}
+
+function syncMobileGeneratorCollapseState() {
+  if (!els.generatorCard || !els.toggleGeneratorBtn) return;
+  if (isMobileViewport() && state.generatorCollapsedOnMobile) {
+    els.generatorCard.classList.add('mobile-collapsed');
+    els.toggleGeneratorBtn.setAttribute('aria-expanded', 'false');
+    els.toggleGeneratorBtn.textContent = '🪄 Custom AI Theme ▾';
+  } else {
+    els.generatorCard.classList.remove('mobile-collapsed');
+    els.toggleGeneratorBtn.setAttribute('aria-expanded', 'true');
+    els.toggleGeneratorBtn.textContent = isMobileViewport() ? '✕ Hide AI Builder ▴' : '🪄 Custom AI Theme';
+  }
+}
+
+function toggleMobileGenerator(forceOpen) {
+  if (typeof forceOpen === 'boolean') {
+    state.generatorCollapsedOnMobile = !forceOpen;
+  } else {
+    state.generatorCollapsedOnMobile = !state.generatorCollapsedOnMobile;
+  }
+  syncMobileGeneratorCollapseState();
+}
+
+function openImageZoom(imgUrl, captionText) {
+  if (!imgUrl || !els.imageZoomOverlay) return;
+  els.zoomModalImg.src = imgUrl;
+  els.zoomModalCaption.textContent = captionText || '';
+  els.imageZoomOverlay.classList.remove('hidden');
+}
+
+function closeImageZoom() {
+  if (!els.imageZoomOverlay) return;
+  els.imageZoomOverlay.classList.add('hidden');
+}
+
 function bindEvents() {
   els.soundToggleBtn.addEventListener('click', () => {
     const muted = soundFx.toggleMute();
@@ -110,8 +177,8 @@ function bindEvents() {
   els.firstLetterToggleBtn.addEventListener('click', () => {
     state.revealFirstLetter = !state.revealFirstLetter;
     els.firstLetterToggleBtn.textContent = state.revealFirstLetter
-      ? '🔤 First Letter Hint: ON'
-      : '🔤 First Letter Hint: OFF';
+      ? '🔤 First Letter: ON'
+      : '🔤 First Letter: OFF';
     els.firstLetterToggleBtn.classList.toggle('active', state.revealFirstLetter);
     if (state.currentPuzzleMeta) {
       resetCurrentPuzzle();
@@ -121,6 +188,12 @@ function bindEvents() {
   els.browseThemesBtn.addEventListener('click', () => {
     els.themesGallerySection.scrollIntoView({ behavior: 'smooth' });
   });
+
+  if (els.toggleGeneratorBtn) {
+    els.toggleGeneratorBtn.addEventListener('click', () => {
+      toggleMobileGenerator();
+    });
+  }
 
   els.themeForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -141,6 +214,20 @@ function bindEvents() {
   els.prevClueBtn.addEventListener('click', () => cycleActiveWord(-1));
   els.nextClueBtn.addEventListener('click', () => cycleActiveWord(1));
 
+  els.spotlightThumbWrap.addEventListener('click', () => {
+    const activeWord = getActiveWord();
+    if (activeWord && activeWord.imageUrl) {
+      openImageZoom(activeWord.imageUrl, `Clue #${activeWord.number}: ${activeWord.questionClue}`);
+    }
+  });
+
+  if (els.closeZoomBtn && els.imageZoomOverlay) {
+    els.closeZoomBtn.addEventListener('click', closeImageZoom);
+    els.imageZoomOverlay.addEventListener('click', (e) => {
+      if (e.target === els.imageZoomOverlay) closeImageZoom();
+    });
+  }
+
   els.hintLetterBtn.addEventListener('click', () => provideHintLetter());
   els.checkGridBtn.addEventListener('click', () => checkGridMistakes());
   els.resetPuzzleBtn.addEventListener('click', () => resetCurrentPuzzle());
@@ -152,22 +239,33 @@ function bindEvents() {
 
   els.victoryNewThemeBtn.addEventListener('click', () => {
     closeVictoryOverlay();
+    toggleMobileGenerator(true);
     els.themeInput.focus();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
   window.addEventListener('keydown', handlePhysicalKeyDown);
+  window.addEventListener('resize', () => {
+    syncMobileGeneratorCollapseState();
+    updateGridCellSize();
+  });
 }
 
 /**
- * Loads a puzzle object ({ title, theme, items }) and builds the crossword layout
+ * Loads a puzzle object ({ id, title, theme, items }) and builds the crossword layout.
+ * IMPORTANT: Renders the new board DOM BEFORE selecting/highlighting cells so that
+ * switching from a larger grid to a smaller grid never indexes stale DOM coordinates!
  */
 export function loadPuzzle(puzzleMeta) {
   closeVictoryOverlay();
+  closeImageZoom();
+
   state.currentPuzzleMeta = JSON.parse(JSON.stringify(puzzleMeta));
   state.layout = buildCrosswordLayout(state.currentPuzzleMeta.items, 10);
   state.solvedWordIds.clear();
   state.wrongCells.clear();
+  state.activeWordId = null;
+  state.focusedCell = null;
 
   // Initialize userGrid
   state.userGrid = Array.from({ length: state.layout.rows }, () =>
@@ -186,12 +284,15 @@ export function loadPuzzle(puzzleMeta) {
   els.totalWordCount.textContent = String(state.layout.words.length);
   els.solvedCount.textContent = '0';
 
-  // Select the first word and its first empty cell
+  // Render the new grid and clue cards FIRST so DOM matches state.layout
+  renderBoard();
+
+  // Then select the first word and its first empty cell
   if (state.layout.words.length > 0) {
     selectWord(state.layout.words[0].id, false);
   }
 
-  renderBoard();
+  updateActivePresetHighlight();
 }
 
 function resetCurrentPuzzle() {
@@ -203,21 +304,23 @@ function resetCurrentPuzzle() {
  * Custom AI Theme Generation Flow
  */
 async function handleGenerateCustomTheme(theme) {
+  const runId = ++state.generationRunId;
   state.isGenerating = true;
   els.generateBtn.disabled = true;
   els.loadingBanner.classList.remove('hidden');
   els.loadingTitle.textContent = `Designing "${theme}" Crossword...`;
-  els.loadingDetail.textContent = 'Asking Gemini AI for kid-friendly words, riddles & picture prompts...';
+  els.loadingDetail.textContent = 'Asking Gemini Flash-Lite for kid-friendly words, riddles & picture prompts...';
 
   const clueCount = Number(els.clueCountSelect.value) || 7;
   const clueStyle = els.clueStyleSelect.value || 'mixed';
 
   try {
     const items = await generateThemedPuzzleItems(theme, { clueCount, clueStyle });
+    if (runId !== state.generationRunId) return;
 
     // Prepare temporary placeholder stickers while AI images stream in
     items.forEach((item) => {
-      if (!item.imageUrl) {
+      if (item.clueType !== 'question' && !item.imageUrl) {
         item.imageUrl = createFallbackStickerDataUrl(item);
         item._needsAiImage = true;
       }
@@ -230,40 +333,60 @@ async function handleGenerateCustomTheme(theme) {
       items,
     };
 
+    // Collapse generator on mobile so the newly created puzzle is front and center
+    if (isMobileViewport()) {
+      toggleMobileGenerator(false);
+    }
+
     // Render the playable crossword immediately so the kid can start right away
     loadPuzzle(customPuzzle);
+    document.getElementById('puzzle-stage')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    // Now generate the AI cartoon illustrations for the clues!
-    const itemsToIllustrate = state.layout.words;
-    els.loadingTitle.textContent = `Painting AI Illustrations for "${theme}"...`;
-    els.loadingDetail.textContent = `Generating picture 1 of ${itemsToIllustrate.length}...`;
+    // Now generate the AI cartoon illustrations for the picture clues!
+    const itemsToIllustrate = state.layout.words.filter((w) => w.clueType !== 'question');
+    if (itemsToIllustrate.length > 0) {
+      els.loadingTitle.textContent = `Painting AI Illustrations for "${theme}"...`;
+      els.loadingDetail.textContent = `Generating picture 1 of ${itemsToIllustrate.length}...`;
 
-    await generatePuzzleIllustrations(
-      itemsToIllustrate,
-      theme,
-      (updatedItem, dataUrl, doneCount, totalCount) => {
-        els.loadingDetail.textContent = `Painted ${doneCount} of ${totalCount} AI illustrations...`;
-        // Update image in live DOM
-        const cardImg = document.querySelector(
-          `[data-clue-word-id="${updatedItem.id}"] .clue-visual-box img`
-        );
-        if (cardImg) {
-          cardImg.src = dataUrl;
+      await generatePuzzleIllustrations(
+        itemsToIllustrate,
+        theme,
+        (updatedItem, dataUrl, doneCount, totalCount) => {
+          if (runId !== state.generationRunId) return;
+          els.loadingDetail.textContent = `Painted ${doneCount} of ${totalCount} AI illustrations...`;
+
+          // Persist generated image into currentPuzzleMeta so Reset / First-Letter toggle preserves it
+          const metaItem = state.currentPuzzleMeta?.items?.find(
+            (it) => it.word.toUpperCase() === updatedItem.word.toUpperCase()
+          );
+          if (metaItem) {
+            metaItem.imageUrl = dataUrl;
+            metaItem._needsAiImage = false;
+          }
+
+          // Update image in live DOM
+          const cardImg = document.querySelector(
+            `[data-clue-word-id="${updatedItem.id}"] .clue-visual-box img`
+          );
+          if (cardImg) {
+            cardImg.src = dataUrl;
+          }
+          const activeWord = getActiveWord();
+          if (activeWord && activeWord.id === updatedItem.id) {
+            updateSpotlightBanner();
+          }
         }
-        const activeWord = getActiveWord();
-        if (activeWord && activeWord.id === updatedItem.id) {
-          updateSpotlightBanner();
-        }
-      }
-    );
+      );
+    }
   } catch (err) {
     console.error('Custom theme generation error:', err);
-    // Fallback: create a fun themed puzzle from preset pool or notify
     alert(`Could not reach AI generator (${err.message}). Try again or pick a featured theme!`);
   } finally {
-    state.isGenerating = false;
-    els.generateBtn.disabled = false;
-    els.loadingBanner.classList.add('hidden');
+    if (runId === state.generationRunId) {
+      state.isGenerating = false;
+      els.generateBtn.disabled = false;
+      els.loadingBanner.classList.add('hidden');
+    }
   }
 }
 
@@ -296,7 +419,7 @@ function selectWord(wordId, playSound = true) {
   const coords = getWordCoordinates(wordObj);
 
   // Pick first empty cell in this word, or the first cell if all filled
-  const firstEmpty = coords.find((c) => !state.userGrid[c.row][c.col]);
+  const firstEmpty = coords.find((c) => !state.userGrid[c.row]?.[c.col]);
   const target = firstEmpty || coords[0];
   state.focusedCell = { row: target.row, col: target.col };
 
@@ -317,18 +440,42 @@ function cycleActiveWord(delta) {
 }
 
 /**
- * Renders the Crossword Grid and Left/Right Clue Columns
+ * Dynamically calculates and applies the optimal --cell-size so that the entire
+ * crossword grid fits comfortably inside the viewport width on mobile and desktop.
+ */
+function updateGridCellSize() {
+  if (!state.layout || !els.crosswordGrid) return;
+  const { rows, cols } = state.layout;
+  const maxDim = Math.max(rows, cols);
+
+  const wrapperWidth =
+    els.crosswordGridWrapper?.clientWidth ||
+    Math.min(window.innerWidth - 28, 640);
+
+  const gap = window.innerWidth <= 600 ? 2 : 3;
+  const gridPadding = 12;
+  const maxAvailableCellWidth = Math.floor((wrapperWidth - gridPadding - (cols - 1) * gap) / cols);
+
+  let desktopIdeal = maxDim > 11 ? 38 : maxDim > 9 ? 44 : 50;
+  if (window.innerWidth <= 600) {
+    desktopIdeal = maxDim > 10 ? 34 : maxDim > 8 ? 38 : 42;
+  }
+
+  const cellSize = Math.max(24, Math.min(desktopIdeal, maxAvailableCellWidth));
+  els.crosswordGrid.style.setProperty('--cell-size', `${cellSize}px`);
+  els.crosswordGrid.style.setProperty('--grid-gap', `${gap}px`);
+  els.crosswordGrid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+}
+
+/**
+ * Renders the Crossword Grid, Quick Clue Jump Pills, and Left/Right Clue Columns
  */
 function renderBoard() {
   if (!state.layout) return;
   const { rows, cols, cells, words } = state.layout;
 
-  // Dynamic cell size so grid fits comfortably on desktop & mobile
-  const maxDim = Math.max(rows, cols);
-  const cellSize = maxDim > 11 ? 38 : maxDim > 9 ? 44 : 50;
-  els.crosswordGrid.style.setProperty('--cell-size', `${cellSize}px`);
-  els.crosswordGrid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
   els.crosswordGrid.innerHTML = '';
+  updateGridCellSize();
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -368,6 +515,9 @@ function renderBoard() {
     }
   }
 
+  // Render 1-tap Clue Jump Bar (1..N)
+  renderClueJumpBar(words);
+
   // Split clues evenly between left and right columns (like Crosswords-for-Kids picture frame)
   els.cluesColLeft.innerHTML = '';
   els.cluesColRight.innerHTML = '';
@@ -386,6 +536,30 @@ function renderBoard() {
   updateSpotlightBanner();
 }
 
+function renderClueJumpBar(words) {
+  if (!els.clueJumpBar) return;
+  els.clueJumpBar.innerHTML = '';
+
+  const label = document.createElement('span');
+  label.className = 'clue-jump-label';
+  label.textContent = 'Clues:';
+  els.clueJumpBar.appendChild(label);
+
+  words.forEach((w) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'clue-jump-pill';
+    btn.dataset.jumpWordId = w.id;
+    const icon = w.clueType === 'question' ? '❓' : '🖼️';
+    btn.innerHTML = `<span class="jump-num">${w.number}</span><span class="jump-icon">${icon}</span>`;
+    btn.title = `Clue ${w.number}: ${w.questionClue}`;
+    btn.addEventListener('click', () => {
+      selectWord(w.id, true);
+    });
+    els.clueJumpBar.appendChild(btn);
+  });
+}
+
 function createClueCardElement(wordObj) {
   const card = document.createElement('div');
   card.className = 'clue-card';
@@ -400,7 +574,7 @@ function createClueCardElement(wordObj) {
     ${
       isQuestionOnly
         ? `<div class="clue-question-icon-box" aria-hidden="true">❓</div>`
-        : `<div class="clue-visual-box">
+        : `<div class="clue-visual-box" title="Tap to select or zoom">
              <img src="${wordObj.imageUrl || createFallbackStickerDataUrl(wordObj)}" alt="Clue ${wordObj.number} picture" loading="lazy" />
            </div>`
     }
@@ -415,8 +589,20 @@ function createClueCardElement(wordObj) {
     </div>
   `;
 
-  card.addEventListener('click', () => {
+  card.addEventListener('click', (e) => {
+    // If clicking the image on an already-selected card on mobile, allow quick zoom
+    if (
+      state.activeWordId === wordObj.id &&
+      e.target.tagName === 'IMG' &&
+      wordObj.imageUrl
+    ) {
+      openImageZoom(wordObj.imageUrl, `Clue #${wordObj.number}: ${wordObj.questionClue}`);
+      return;
+    }
     selectWord(wordObj.id, true);
+    if (isMobileViewport()) {
+      document.getElementById('active-clue-banner')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   });
 
   return card;
@@ -426,7 +612,7 @@ function formatWordSlotsPreview(wordObj) {
   const coords = getWordCoordinates(wordObj);
   return coords
     .map((c) => {
-      const ch = state.userGrid[c.row][c.col];
+      const ch = state.userGrid[c.row]?.[c.col];
       return ch ? ch : '_';
     })
     .join(' ');
@@ -434,7 +620,7 @@ function formatWordSlotsPreview(wordObj) {
 
 function handleCellClick(row, col) {
   if (!state.layout) return;
-  const cellData = state.layout.cells[row][col];
+  const cellData = state.layout.cells[row]?.[col];
   if (!cellData || !cellData.active) return;
 
   // If clicking the already focused cell and it belongs to 2 words, toggle direction!
@@ -457,6 +643,11 @@ function handleCellClick(row, col) {
 }
 
 function handlePhysicalKeyDown(e) {
+  if (e.key === 'Escape') {
+    closeImageZoom();
+    return;
+  }
+
   // Ignore if typing inside the theme generator input
   if (
     document.activeElement &&
@@ -510,7 +701,7 @@ function moveFocusByDelta(dr, dc) {
   let r = state.focusedCell.row + dr;
   let c = state.focusedCell.col + dc;
   if (r >= 0 && r < state.layout.rows && c >= 0 && c < state.layout.cols) {
-    const target = state.layout.cells[r][c];
+    const target = state.layout.cells[r]?.[c];
     if (target && target.active) {
       handleCellClick(r, c);
     }
@@ -520,6 +711,7 @@ function moveFocusByDelta(dr, dc) {
 function handleLetterInput(letter) {
   if (!state.layout || !state.focusedCell) return;
   const { row, col } = state.focusedCell;
+  if (!state.userGrid[row]) return;
 
   state.userGrid[row][col] = letter;
   state.wrongCells.delete(`${row},${col}`);
@@ -537,6 +729,7 @@ function handleLetterInput(letter) {
 function handleBackspaceInput() {
   if (!state.layout || !state.focusedCell) return;
   const { row, col } = state.focusedCell;
+  if (!state.userGrid[row]) return;
 
   if (state.userGrid[row][col]) {
     state.userGrid[row][col] = '';
@@ -544,8 +737,10 @@ function handleBackspaceInput() {
   } else {
     advanceCursorInActiveWord(-1);
     const prev = state.focusedCell;
-    state.userGrid[prev.row][prev.col] = '';
-    state.wrongCells.delete(`${prev.row},${prev.col}`);
+    if (state.userGrid[prev.row]) {
+      state.userGrid[prev.row][prev.col] = '';
+      state.wrongCells.delete(`${prev.row},${prev.col}`);
+    }
   }
 
   soundFx.playKeyClick();
@@ -565,7 +760,7 @@ function advanceCursorInActiveWord(step) {
 
   if (step > 0) {
     // Prefer next empty cell in this word, otherwise just step + 1
-    const nextEmpty = coords.slice(idx + 1).find((c) => !state.userGrid[c.row][c.col]);
+    const nextEmpty = coords.slice(idx + 1).find((c) => !state.userGrid[c.row]?.[c.col]);
     if (nextEmpty) {
       state.focusedCell = { row: nextEmpty.row, col: nextEmpty.col };
     } else if (idx + 1 < coords.length) {
@@ -588,7 +783,7 @@ function evaluateSolvedWords(triggerCelebrations = true) {
   for (const w of state.layout.words) {
     const coords = getWordCoordinates(w);
     const isCompleteAndCorrect = coords.every(
-      (c) => state.userGrid[c.row][c.col] === c.solution
+      (c) => state.userGrid[c.row]?.[c.col] === c.solution
     );
 
     if (isCompleteAndCorrect) {
@@ -683,7 +878,9 @@ function closeVictoryOverlay() {
 function fillWordSolution(wordObj, celebrate = true) {
   const coords = getWordCoordinates(wordObj);
   for (const c of coords) {
-    state.userGrid[c.row][c.col] = c.solution;
+    if (state.userGrid[c.row]) {
+      state.userGrid[c.row][c.col] = c.solution;
+    }
     state.wrongCells.delete(`${c.row},${c.col}`);
   }
   if (celebrate) {
@@ -702,7 +899,7 @@ function provideHintLetter() {
   if (activeWord) {
     const coords = getWordCoordinates(activeWord);
     const needsHelp = coords.find(
-      (c) => state.userGrid[c.row][c.col] !== c.solution
+      (c) => state.userGrid[c.row]?.[c.col] !== c.solution
     );
     if (needsHelp) {
       targetRow = needsHelp.row;
@@ -712,8 +909,10 @@ function provideHintLetter() {
   }
 
   if (targetRow == null || targetCol == null) return;
-  const solution = state.layout.cells[targetRow][targetCol].solution;
-  handleLetterInput(solution);
+  const solution = state.layout.cells[targetRow]?.[targetCol]?.solution;
+  if (solution) {
+    handleLetterInput(solution);
+  }
 }
 
 /**
@@ -727,9 +926,9 @@ function checkGridMistakes() {
 
   for (let r = 0; r < state.layout.rows; r++) {
     for (let c = 0; c < state.layout.cols; c++) {
-      const cell = state.layout.cells[r][c];
-      if (!cell.active) continue;
-      const entered = state.userGrid[r][c];
+      const cell = state.layout.cells[r]?.[c];
+      if (!cell || !cell.active) continue;
+      const entered = state.userGrid[r]?.[c];
       if (entered && entered !== cell.solution) {
         state.wrongCells.add(`${r},${c}`);
         mistakes++;
@@ -755,16 +954,18 @@ function updateBoardHighlights() {
     }
   }
 
-  // Update grid cells
+  // Update grid cells with safe bounds check
   const cellEls = els.crosswordGrid.querySelectorAll('.xw-cell.letter-cell');
   cellEls.forEach((cellEl) => {
     const r = Number(cellEl.dataset.row);
     const c = Number(cellEl.dataset.col);
+    const cellData = state.layout.cells[r]?.[c];
+    if (!cellData) return;
+
     const k = `${r},${c}`;
-    const cellData = state.layout.cells[r][c];
     const charSpan = cellEl.querySelector('.cell-char');
     if (charSpan) {
-      charSpan.textContent = state.userGrid[r][c] || '';
+      charSpan.textContent = state.userGrid[r]?.[c] || '';
     }
 
     const isFocused =
@@ -779,15 +980,29 @@ function updateBoardHighlights() {
     cellEl.classList.toggle('cell-wrong', Boolean(isWrong));
   });
 
-  // Update clue cards
+  // Update clue cards & jump pills
   state.layout.words.forEach((w) => {
+    const isSelected = w.id === state.activeWordId;
+    const isSolved = state.solvedWordIds.has(w.id);
+
     const card = document.querySelector(`[data-clue-word-id="${w.id}"]`);
-    if (!card) return;
-    card.classList.toggle('selected', w.id === state.activeWordId);
-    card.classList.toggle('solved', state.solvedWordIds.has(w.id));
-    const slotsEl = card.querySelector(`[data-slots-for="${w.id}"]`);
-    if (slotsEl) {
-      slotsEl.textContent = formatWordSlotsPreview(w);
+    if (card) {
+      card.classList.toggle('selected', isSelected);
+      card.classList.toggle('solved', isSolved);
+      const slotsEl = card.querySelector(`[data-slots-for="${w.id}"]`);
+      if (slotsEl) {
+        slotsEl.textContent = formatWordSlotsPreview(w);
+      }
+    }
+
+    const jumpPill = els.clueJumpBar?.querySelector(`[data-jump-word-id="${w.id}"]`);
+    if (jumpPill) {
+      jumpPill.classList.toggle('selected', isSelected);
+      jumpPill.classList.toggle('solved', isSolved);
+      const iconEl = jumpPill.querySelector('.jump-icon');
+      if (iconEl) {
+        iconEl.textContent = isSolved ? '✓' : w.clueType === 'question' ? '❓' : '🖼️';
+      }
     }
   });
 }
@@ -800,7 +1015,7 @@ function updateSpotlightBanner() {
   const isQuestion = activeWord.clueType === 'question';
   els.spotlightTypeBadge.textContent = isQuestion
     ? '❓ Question Clue'
-    : '🖼️ AI Picture Clue';
+    : '🖼️ Picture Clue';
   els.spotlightTypeBadge.classList.toggle('question-mode', isQuestion);
 
   els.spotlightDirBadge.textContent = `${activeWord.direction.toUpperCase()} • ${
@@ -808,11 +1023,37 @@ function updateSpotlightBanner() {
   } Letters`;
   els.spotlightQuestion.textContent = activeWord.questionClue;
 
-  if (activeWord.imageUrl) {
+  if (activeWord.imageUrl && (!isQuestion || !activeWord._needsAiImage)) {
     els.spotlightThumbWrap.classList.remove('hidden');
     els.spotlightImg.src = activeWord.imageUrl;
   } else {
     els.spotlightThumbWrap.classList.add('hidden');
+  }
+
+  // Render interactive letter boxes in the spotlight banner for quick mobile glance & tap
+  if (els.spotlightWordSlots) {
+    const coords = getWordCoordinates(activeWord);
+    els.spotlightWordSlots.innerHTML = '';
+    coords.forEach((c) => {
+      const box = document.createElement('button');
+      box.type = 'button';
+      const ch = state.userGrid[c.row]?.[c.col] || '';
+      const isFocused =
+        state.focusedCell &&
+        state.focusedCell.row === c.row &&
+        state.focusedCell.col === c.col;
+      const isWrong = state.wrongCells.has(`${c.row},${c.col}`);
+      box.className = `spotlight-slot-box ${ch ? 'filled' : ''} ${isFocused ? 'focused' : ''} ${
+        isWrong ? 'wrong' : ''
+      }`;
+      box.textContent = ch || '_';
+      box.addEventListener('click', () => {
+        state.focusedCell = { row: c.row, col: c.col };
+        updateBoardHighlights();
+        updateSpotlightBanner();
+      });
+      els.spotlightWordSlots.appendChild(box);
+    });
   }
 }
 
@@ -846,6 +1087,39 @@ function renderVirtualKeyboard() {
   });
 }
 
+function renderQuickPresetsStrip() {
+  if (!els.quickPresetsStrip) return;
+  els.quickPresetsStrip.innerHTML = '';
+
+  const label = document.createElement('span');
+  label.className = 'quick-presets-label';
+  label.textContent = 'Play Theme:';
+  els.quickPresetsStrip.appendChild(label);
+
+  PRESET_PUZZLES.forEach((preset) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'quick-preset-pill';
+    btn.dataset.quickPresetId = preset.id;
+    const icon = PRESET_ICONS[preset.id] || '🧩';
+    btn.textContent = `${icon} ${preset.theme}`;
+    btn.addEventListener('click', () => {
+      loadPuzzle(preset);
+    });
+    els.quickPresetsStrip.appendChild(btn);
+  });
+}
+
+function updateActivePresetHighlight() {
+  const currentId = state.currentPuzzleMeta?.id;
+  document.querySelectorAll('[data-quick-preset-id]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.quickPresetId === currentId);
+  });
+  document.querySelectorAll('[data-preset-id]').forEach((card) => {
+    card.classList.toggle('active-preset-card', card.dataset.presetId === currentId);
+  });
+}
+
 function renderPresetGallery() {
   els.presetCardsList.innerHTML = '';
   PRESET_PUZZLES.forEach((preset) => {
@@ -873,7 +1147,7 @@ function renderPresetGallery() {
 
     card.addEventListener('click', () => {
       loadPuzzle(preset);
-      document.getElementById('puzzle-stage').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('puzzle-stage')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
     els.presetCardsList.appendChild(card);

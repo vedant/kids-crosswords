@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#3f006a" />
     <title>Crosswords for Kids | AI Picture &amp; Question Crosswords</title>
     <link rel="preload" href="/fonts/subset-BDCartoonShout.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
@@ -12,6 +12,15 @@
   <body class="en crossword">
     <!-- Floating celebration layer for per-clue "YAAAY!" + sparkles -->
     <div id="clue-cheer-layer" aria-live="polite"></div>
+
+    <!-- Tap-to-Zoom Clue Picture Lightbox (for clear mobile viewing) -->
+    <div id="image-zoom-overlay" class="image-zoom-overlay hidden" role="dialog" aria-modal="true" aria-label="Enlarged Clue Picture">
+      <div class="image-zoom-card">
+        <button id="btn-close-zoom" class="btn-close-zoom" type="button" aria-label="Close enlarged picture">✕</button>
+        <img id="zoom-modal-img" src="" alt="Enlarged clue illustration" />
+        <p id="zoom-modal-caption" class="zoom-modal-caption"></p>
+      </div>
+    </div>
 
     <!-- Grand Puzzle Victory Modal & Full-screen Fireworks Canvas -->
     <div id="victory-overlay" class="victory-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="victory-title">
@@ -51,7 +60,7 @@
               🔊 Sound: ON
             </button>
             <button id="btn-first-letter-toggle" class="btn-pill active" type="button" title="Reveal first letter of each word (Kid Helper)">
-              🔤 First Letter Hint: ON
+              🔤 First Letter: ON
             </button>
             <button id="btn-Browse-themes" class="btn-pill" type="button">
               🎨 All Themes
@@ -61,59 +70,67 @@
       </header>
 
       <main id="page">
-        <!-- Custom AI Theme Generator Bar -->
-        <section class="theme-generator-card" aria-label="Custom Theme Crossword Generator">
+        <!-- Custom AI Theme Generator Bar (Collapsible on Mobile so Board stays front-and-center) -->
+        <section id="theme-generator-card" class="theme-generator-card" aria-label="Custom Theme Crossword Generator">
           <div class="generator-header">
-            <h2>✨ Create Any Crossword Theme!</h2>
-            <span class="generator-badge">5–10 Clues • AI Pictures + Questions</span>
-          </div>
-          <form id="theme-generator-form" class="generator-form">
-            <div class="input-group theme-input-wrap">
-              <label for="theme-input">Puzzle Theme</label>
-              <input
-                id="theme-input"
-                type="text"
-                placeholder="e.g. Baby Animals, Construction Trucks, Superheroes, Ice Cream, US Presidents..."
-                required
-                maxlength="80"
-              />
+            <div class="generator-title-row">
+              <h2>✨ Create Any Crossword Theme!</h2>
+              <span class="generator-badge">5–10 Clues • AI Pictures + Questions</span>
             </div>
-
-            <div class="input-group small-select">
-              <label for="clue-count-select">Clues (5–10)</label>
-              <select id="clue-count-select">
-                <option value="5">5 Clues (Quick)</option>
-                <option value="6">6 Clues</option>
-                <option value="7" selected>7 Clues (Standard)</option>
-                <option value="8">8 Clues</option>
-                <option value="9">9 Clues</option>
-                <option value="10">10 Clues (Challenge)</option>
-              </select>
-            </div>
-
-            <div class="input-group small-select">
-              <label for="clue-style-select">Clue Style</label>
-              <select id="clue-style-select">
-                <option value="mixed" selected>🖼️ + ❓ Mix (AI Pictures &amp; Questions)</option>
-                <option value="images">🖼️ Picture Clues Only (AI Generated)</option>
-                <option value="questions">❓ Question / Riddle Clues Only</option>
-              </select>
-            </div>
-
-            <button id="btn-generate-theme" class="btn-cartoon fushia generate-submit-btn" type="submit">
-              🪄 Generate Crossword!
+            <button id="btn-toggle-generator" class="btn-toggle-generator" type="button" aria-expanded="true">
+              🪄 Custom AI Theme ▾
             </button>
-          </form>
+          </div>
 
-          <!-- Quick theme chips -->
-          <div class="quick-theme-chips">
-            <span class="chips-label">Try a theme:</span>
-            <button type="button" class="theme-chip" data-quick-theme="Construction Trucks & Diggers">🚜 Construction Trucks</button>
-            <button type="button" class="theme-chip" data-quick-theme="Jungle Safari Animals">🦁 Jungle Safari</button>
-            <button type="button" class="theme-chip" data-quick-theme="Yummy Fruits & Treats">🍓 Yummy Fruits</button>
-            <button type="button" class="theme-chip" data-quick-theme="Musical Instruments">🎸 Musical Instruments</button>
-            <button type="button" class="theme-chip" data-quick-theme="Bugs & Garden Insects">🐞 Bugs &amp; Insects</button>
-            <button type="button" class="theme-chip" data-quick-theme="Fairy Tale Kingdom">🏰 Fairy Tale Kingdom</button>
+          <div id="generator-collapsible-body" class="generator-collapsible-body">
+            <form id="theme-generator-form" class="generator-form">
+              <div class="input-group theme-input-wrap">
+                <label for="theme-input">Puzzle Theme</label>
+                <input
+                  id="theme-input"
+                  type="text"
+                  placeholder="e.g. Baby Animals, Construction Trucks, Superheroes, Ice Cream..."
+                  required
+                  maxlength="80"
+                />
+              </div>
+
+              <div class="input-group small-select">
+                <label for="clue-count-select">Clues (5–10)</label>
+                <select id="clue-count-select">
+                  <option value="5">5 Clues (Quick)</option>
+                  <option value="6">6 Clues</option>
+                  <option value="7" selected>7 Clues (Standard)</option>
+                  <option value="8">8 Clues</option>
+                  <option value="9">9 Clues</option>
+                  <option value="10">10 Clues (Challenge)</option>
+                </select>
+              </div>
+
+              <div class="input-group small-select">
+                <label for="clue-style-select">Clue Style</label>
+                <select id="clue-style-select">
+                  <option value="mixed" selected>🖼️ + ❓ Mix (AI Pictures &amp; Questions)</option>
+                  <option value="images">🖼️ Picture Clues Only (AI Generated)</option>
+                  <option value="questions">❓ Question / Riddle Clues Only</option>
+                </select>
+              </div>
+
+              <button id="btn-generate-theme" class="btn-cartoon fushia generate-submit-btn" type="submit">
+                🪄 Generate Crossword!
+              </button>
+            </form>
+
+            <!-- Quick AI theme chips -->
+            <div class="quick-theme-chips">
+              <span class="chips-label">AI Theme Ideas:</span>
+              <button type="button" class="theme-chip" data-quick-theme="Construction Trucks & Diggers">🚜 Construction Trucks</button>
+              <button type="button" class="theme-chip" data-quick-theme="Jungle Safari Animals">🦁 Jungle Safari</button>
+              <button type="button" class="theme-chip" data-quick-theme="Yummy Fruits & Treats">🍓 Yummy Fruits</button>
+              <button type="button" class="theme-chip" data-quick-theme="Musical Instruments">🎸 Musical Instruments</button>
+              <button type="button" class="theme-chip" data-quick-theme="Bugs & Garden Insects">🐞 Bugs &amp; Insects</button>
+              <button type="button" class="theme-chip" data-quick-theme="Fairy Tale Kingdom">🏰 Fairy Tale Kingdom</button>
+            </div>
           </div>
 
           <!-- Progress indicator during live AI generation -->
@@ -128,6 +145,9 @@
 
         <!-- Active Crossword Game Stage (modeled after Crosswords-For-Kids canvas board) -->
         <section id="puzzle-stage" class="puzzle-stage" aria-label="Crossword Puzzle Board">
+          <!-- Instant Ready-to-Play Theme Switcher Strip -->
+          <div id="quick-presets-strip" class="quick-presets-strip" aria-label="Quick Theme Switcher"></div>
+
           <div class="stage-top-bar">
             <div class="puzzle-title-block">
               <span id="active-theme-pill" class="theme-pill">Theme: Baby Animals</span>
@@ -136,25 +156,31 @@
 
             <div class="score-and-actions">
               <div class="progress-pill" id="words-progress-pill">
-                ⭐ Solved: <strong id="solved-count">0</strong> / <strong id="total-word-count">7</strong>
+                ⭐ <span class="progress-label-text">Solved:</span> <strong id="solved-count">0</strong>/<strong id="total-word-count">7</strong>
               </div>
               <button id="btn-hint-letter" class="btn-action orange" type="button" title="Fill in the current square">
-                💡 Hint Letter
+                💡 <span class="btn-action-text">Hint Letter</span>
               </button>
               <button id="btn-check-grid" class="btn-action blue" type="button" title="Mark mistakes in red">
-                ✔️ Check Grid
+                ✔️ <span class="btn-action-text">Check Grid</span>
               </button>
               <button id="btn-reset-puzzle" class="btn-action purple" type="button" title="Clear and restart this puzzle">
-                🔄 Reset
+                🔄 <span class="btn-action-text">Reset</span>
               </button>
             </div>
           </div>
 
+          <!-- Quick Clue Number Jump Pills (1..N) for instant 1-tap navigation on mobile & desktop -->
+          <div id="clue-jump-bar" class="clue-jump-bar" aria-label="Jump to Clue Number"></div>
+
           <!-- Active Clue Spotlight Banner -->
           <div id="active-clue-banner" class="active-clue-banner">
+            <button id="btn-prev-clue" class="btn-nav-clue" type="button" aria-label="Previous Clue">◀</button>
+
             <div class="active-clue-num" id="spotlight-number">1</div>
-            <div class="active-clue-thumb-wrap" id="spotlight-thumb-wrap">
+            <div class="active-clue-thumb-wrap" id="spotlight-thumb-wrap" title="Tap to enlarge picture">
               <img id="spotlight-img" src="" alt="Selected clue illustration" />
+              <span class="thumb-zoom-hint" aria-hidden="true">🔍</span>
             </div>
             <div class="active-clue-copy">
               <div class="spotlight-meta">
@@ -164,14 +190,14 @@
               <p id="spotlight-question" class="spotlight-question">
                 Click any picture, question card, or square in the grid to start spelling!
               </p>
+              <div id="spotlight-word-slots" class="spotlight-word-slots" aria-label="Active word letter boxes"></div>
             </div>
-            <div class="spotlight-controls">
-              <button id="btn-prev-clue" class="btn-nav-clue" type="button" aria-label="Previous Clue">◀</button>
-              <button id="btn-next-clue" class="btn-nav-clue" type="button" aria-label="Next Clue">▶</button>
-            </div>
+
+            <button id="btn-next-clue" class="btn-nav-clue" type="button" aria-label="Next Clue">▶</button>
           </div>
 
           <!-- Main Board Layout: Left Clues + Center Crossword Grid + Right Clues -->
+          <!-- On mobile, CSS orders .grid-center-column FIRST so the grid + keyboard are right under the active clue -->
           <div class="board-workspace">
             <div id="clues-col-left" class="clues-column" aria-label="Clues Part 1"></div>
 
@@ -180,7 +206,7 @@
                 <div id="crossword-grid" class="crossword-grid" role="grid" aria-label="Crossword Letters Grid"></div>
               </div>
 
-              <!-- Kid-Friendly On-Screen Alphabet Keypad (great for tablets, touchscreens, and young kids) -->
+              <!-- Kid-Friendly On-Screen Alphabet Keypad (great for phones, tablets, and young kids) -->
               <div id="virtual-keyboard" class="virtual-keyboard" aria-label="On-screen Letter Keypad"></div>
             </div>
 
@@ -192,7 +218,7 @@
         <section id="themes-gallery-section" class="themes-gallery-section">
           <h2 class="section-heading">🌟 Featured Picture &amp; Question Crosswords</h2>
           <p class="section-sub">
-            Click any themed card below to play right away, or type your own theme above to generate a brand-new AI puzzle!
+            Tap any themed card below to play right away, or type your own theme above to generate a brand-new AI puzzle!
           </p>
           <div id="preset-cards-list" class="list"></div>
         </section>
@@ -203,26 +229,26 @@
           <ul class="howplay-grid">
             <li>
               <span class="number">1</span>
-              Click on a <strong>picture clue</strong> or <strong>question card</strong>, and enter the letters of the matching word! When you spell a word right, you’ll hear <em>"Yaaay!"</em> and see stars!
+              Tap on a <strong>picture clue</strong>, <strong>number pill</strong>, or <strong>square</strong>, and enter the letters of the matching word! When you spell a word right, you’ll hear <em>"Yaaay!"</em> and see stars!
             </li>
             <li>
               <span class="number orange">2</span>
-              Click on the <strong>"Check Grid"</strong> button anytime to see if you made mistakes and highlight wrong letters in red.
+              Tap on the <strong>"Check Grid"</strong> button anytime to see if you made mistakes and highlight wrong letters in red.
             </li>
             <li>
               <span class="number fushia">3</span>
-              Use <strong>Tab</strong> or the arrow buttons to jump to the next clue, and <strong>Arrow keys</strong> or <strong>Backspace</strong> to move between squares.
+              Use the <strong>◀ / ▶ arrows</strong> or numbered pills to jump between clues, and tap any picture to zoom in!
             </li>
             <li>
               <span class="number vert">4</span>
-              Want a custom topic? Type <strong>any theme</strong> in the generator box above and AI will create 5–10 fresh clues and illustrations!
+              Want a custom topic? Open <strong>Custom AI Theme</strong> at the top and AI will create 5–10 fresh clues and illustrations!
             </li>
           </ul>
         </section>
       </main>
 
       <footer class="site-footer">
-        <p>Crosswords for Kids • Powered by Gemini AI Illustrations &amp; Interactive Learning</p>
+        <p>Crosswords for Kids • Powered by Gemini Flash-Lite AI Illustrations &amp; Interactive Learning</p>
       </footer>
     </div>
 
