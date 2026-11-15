@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#3f006a" />
-    <title>Crosswords for Kids | AI Picture &amp; Question Crosswords</title>
+    <meta name="theme-color" content="#2b1055" />
+    <title>Crosswords | AI Picture &amp; Question Crosswords</title>
     <link rel="preload" href="/fonts/subset-BDCartoonShout.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
     <link rel="preload" href="/fonts/Roboto-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
     <link rel="stylesheet" href="/style.css" />
@@ -13,7 +13,7 @@
     <!-- Floating celebration layer for per-clue "YAAAY!" + sparkles -->
     <div id="clue-cheer-layer" aria-live="polite"></div>
 
-    <!-- Tap-to-Zoom Clue Picture Lightbox (for clear mobile viewing) -->
+    <!-- Tap-to-Zoom Clue Picture Lightbox -->
     <div id="image-zoom-overlay" class="image-zoom-overlay hidden" role="dialog" aria-modal="true" aria-label="Enlarged Clue Picture">
       <div class="image-zoom-card">
         <button id="btn-close-zoom" class="btn-close-zoom" type="button" aria-label="Close enlarged picture">✕</button>
@@ -22,125 +22,110 @@
       </div>
     </div>
 
-    <!-- Grand Puzzle Victory Modal & Full-screen Fireworks Canvas -->
+    <!-- Grand Puzzle Victory Modal & Fireworks Canvas -->
     <div id="victory-overlay" class="victory-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="victory-title">
       <canvas id="victory-canvas"></canvas>
       <div class="victory-card">
         <div class="victory-trophy-bounce">🏆</div>
         <div class="victory-stars-row">⭐ 🌟 ⭐ 🌟 ⭐</div>
-        <h2 id="victory-title" class="victory-heading">YAAAY! PUZZLE SOLVED!</h2>
+        <h2 id="victory-title" class="victory-heading">PUZZLE SOLVED!</h2>
         <p id="victory-subtitle" class="victory-subtitle">You found every single word!</p>
         <div id="victory-word-pills" class="victory-word-pills"></div>
         <div id="victory-actions">
-          <button id="btn-victory-replay" class="btn-cartoon orange" type="button">🔄 Play Again</button>
-          <button id="btn-victory-new-theme" class="btn-cartoon fushia" type="button">✨ New Theme Puzzle</button>
+          <button id="btn-victory-replay" class="btn-cartoon orange" type="button">↻ Play Again</button>
+          <button id="btn-victory-new-theme" class="btn-cartoon fushia" type="button">✨ New Theme</button>
         </div>
       </div>
     </div>
 
     <div id="wrapper">
-      <!-- Cosmic Header modeled after Crosswords-For-Kids.com -->
+      <!-- Clean, Slim Header -->
       <header id="site-header">
         <div class="header-inner">
           <div class="brand-Area">
-            <div class="mascot-badge floatAnim" aria-hidden="true">🚀</div>
-            <div class="brand-titles">
-              <h1 class="site-logo-title">
-                <span class="logo-blue">CROSSWORDS</span>
-                <span class="logo-orange">FOR</span>
-                <span class="logo-pink">KIDS</span>
-              </h1>
-              <p class="site-tagline">AI-Powered Picture &amp; Question Crossword Generator!</p>
-            </div>
-            <div class="mascot-badge floatAnim2" aria-hidden="true">🦖</div>
+            <h1 class="site-logo-title">
+              <span class="logo-blue">CROSSWORDS</span>
+              <span class="logo-orange">FOR</span>
+              <span class="logo-pink">ALL</span>
+            </h1>
           </div>
 
           <div class="header-controls">
-            <button id="btn-sound-toggle" class="btn-pill" type="button" title="Toggle Sound Effects">
-              🔊 Sound: ON
+            <button id="btn-first-letter-toggle" class="btn-pill active" type="button" title="Reveal first letter of each word">
+              First Letter: ON
             </button>
-            <button id="btn-first-letter-toggle" class="btn-pill active" type="button" title="Reveal first letter of each word (Helper)">
-              🔤 First Letter: ON
+            <button id="btn-keyboard-toggle" class="btn-pill desktop-only-pill" type="button" title="Show or hide on-screen keypad">
+              Keypad
+            </button>
+            <button id="btn-sound-toggle" class="btn-pill" type="button" title="Toggle Sound Effects">
+              Sound: ON
             </button>
             <button id="btn-Browse-themes" class="btn-pill" type="button">
-              🎨 All Themes
+              Themes
             </button>
           </div>
         </div>
       </header>
 
       <main id="page">
-        <!-- Custom AI Theme Generator Bar (Collapsible on Mobile so Board stays front-and-center) -->
+        <!-- Compact Custom AI Theme Bar (Collapsible on Mobile) -->
         <section id="theme-generator-card" class="theme-generator-card" aria-label="Custom Theme Crossword Generator">
-          <div class="generator-header">
-            <div class="generator-title-row">
-              <h2>✨ Create Any Crossword Theme!</h2>
-              <span class="generator-badge">Elementary to College • AI Pictures + Clues</span>
-            </div>
+          <div class="generator-mobile-bar">
+            <span class="generator-mobile-label">Custom AI Crossword</span>
             <button id="btn-toggle-generator" class="btn-toggle-generator" type="button" aria-expanded="true">
-              🪄 Custom AI Theme ▾
+              Create Theme ▾
             </button>
           </div>
 
           <div id="generator-collapsible-body" class="generator-collapsible-body">
             <form id="theme-generator-form" class="generator-form">
               <div class="input-group theme-input-wrap">
-                <label for="theme-input">Puzzle Theme</label>
+                <label for="theme-input">Custom Theme</label>
                 <input
                   id="theme-input"
                   type="text"
-                  placeholder="e.g. Baby Animals, Ancient Rome, Astrophysics, Molecular Biology..."
+                  placeholder="Enter any topic (e.g. Baby Animals, Ancient Rome, Quantum Mechanics)..."
                   required
                   maxlength="80"
                 />
               </div>
 
               <div class="input-group small-select">
-                <label for="difficulty-select">Difficulty Level</label>
+                <label for="difficulty-select">Difficulty</label>
                 <select id="difficulty-select">
-                  <option value="elementary" selected>🌱 Elementary (Default)</option>
-                  <option value="middle">📘 Middle School</option>
-                  <option value="high">🎓 High School (AP / SAT)</option>
-                  <option value="college">🏛️ College / Expert</option>
+                  <option value="elementary" selected>Elementary (Default)</option>
+                  <option value="middle">Middle School</option>
+                  <option value="high">High School (AP / SAT)</option>
+                  <option value="college">College</option>
+                  <option value="grandmaster">Grandmaster (Ultra-Expert)</option>
                 </select>
               </div>
 
               <div class="input-group small-select">
-                <label for="clue-count-select">Clues (5–10)</label>
+                <label for="clue-count-select">Clues</label>
                 <select id="clue-count-select">
-                  <option value="5">5 Clues (Quick)</option>
+                  <option value="5">5 Clues</option>
                   <option value="6">6 Clues</option>
-                  <option value="7" selected>7 Clues (Standard)</option>
+                  <option value="7" selected>7 Clues</option>
                   <option value="8">8 Clues</option>
                   <option value="9">9 Clues</option>
-                  <option value="10">10 Clues (Challenge)</option>
+                  <option value="10">10 Clues</option>
                 </select>
               </div>
 
               <div class="input-group small-select">
-                <label for="clue-style-select">Clue Style</label>
+                <label for="clue-style-select">Style</label>
                 <select id="clue-style-select">
-                  <option value="mixed" selected>🖼️ + ❓ Mix (Pictures &amp; Clues)</option>
-                  <option value="images">🖼️ Picture Clues Only</option>
-                  <option value="questions">❓ Text Clues Only</option>
+                  <option value="mixed" selected>Pictures &amp; Clues</option>
+                  <option value="images">Pictures Only</option>
+                  <option value="questions">Text Clues Only</option>
                 </select>
               </div>
 
               <button id="btn-generate-theme" class="btn-cartoon fushia generate-submit-btn" type="submit">
-                🪄 Generate Crossword!
+                Generate
               </button>
             </form>
-
-            <!-- Quick AI theme chips -->
-            <div class="quick-theme-chips">
-              <span class="chips-label">AI Theme Ideas:</span>
-              <button type="button" class="theme-chip" data-quick-theme="Construction Trucks & Diggers">🚜 Construction Trucks</button>
-              <button type="button" class="theme-chip" data-quick-theme="Jungle Safari Animals">🦁 Jungle Safari</button>
-              <button type="button" class="theme-chip" data-quick-theme="Yummy Fruits & Treats">🍓 Yummy Fruits</button>
-              <button type="button" class="theme-chip" data-quick-theme="Musical Instruments">🎸 Musical Instruments</button>
-              <button type="button" class="theme-chip" data-quick-theme="Greek Mythology">⚡ Greek Mythology</button>
-              <button type="button" class="theme-chip" data-quick-theme="Quantum Physics & Cosmology" data-quick-difficulty="college">🌌 Quantum Physics (College)</button>
-            </div>
           </div>
 
           <!-- Progress indicator during live AI generation -->
@@ -148,66 +133,60 @@
             <div class="spinner-orb"></div>
             <div class="loading-text-wrap">
               <strong id="ai-loading-title">Crafting your custom crossword...</strong>
-              <span id="ai-loading-detail">Generating interconnected words and AI illustrations...</span>
+              <span id="ai-loading-detail">Verifying vocabulary, clues, and intersections...</span>
             </div>
           </div>
         </section>
 
-        <!-- Active Crossword Game Stage (modeled after Crosswords-For-Kids canvas board) -->
+        <!-- Active Crossword Game Stage -->
         <section id="puzzle-stage" class="puzzle-stage" aria-label="Crossword Puzzle Board">
-          <!-- Instant Ready-to-Play Theme Switcher Strip -->
+          <!-- Clean Preset Switcher Tabs -->
           <div id="quick-presets-strip" class="quick-presets-strip" aria-label="Quick Theme Switcher"></div>
 
           <div class="stage-top-bar">
             <div class="puzzle-title-block">
-              <span id="active-theme-pill" class="theme-pill">Theme: Baby Animals • 🌱 Elementary</span>
               <h2 id="active-puzzle-title">Baby Animals Crossword</h2>
+              <span id="active-theme-pill" class="theme-pill">Elementary</span>
             </div>
 
             <div class="score-and-actions">
               <div class="progress-pill" id="words-progress-pill">
-                ⭐ <span class="progress-label-text">Solved:</span> <strong id="solved-count">0</strong>/<strong id="total-word-count">7</strong>
+                <strong id="solved-count">0</strong>/<strong id="total-word-count">7</strong> <span class="progress-label-text">Solved</span>
               </div>
-              <button id="btn-hint-letter" class="btn-action orange" type="button" title="Fill in the current square">
-                💡 <span class="btn-action-text">Hint Letter</span>
+              <button id="btn-hint-letter" class="btn-action orange" type="button" title="Fill in a letter">
+                Hint
               </button>
-              <button id="btn-check-grid" class="btn-action blue" type="button" title="Mark mistakes in red">
-                ✔️ <span class="btn-action-text">Check Grid</span>
+              <button id="btn-check-grid" class="btn-action blue" type="button" title="Highlight mistakes in red">
+                Check
               </button>
-              <button id="btn-reset-puzzle" class="btn-action purple" type="button" title="Clear and restart this puzzle">
-                🔄 <span class="btn-action-text">Reset</span>
+              <button id="btn-reset-puzzle" class="btn-action subtle" type="button" title="Clear and restart this puzzle">
+                Reset
               </button>
             </div>
           </div>
 
-          <!-- Quick Clue Number Jump Pills (1..N) for instant 1-tap navigation on mobile & desktop -->
+          <!-- Compact Clue Number Jump Pills (shown on mobile/tablet where clue list stacks below grid) -->
           <div id="clue-jump-bar" class="clue-jump-bar" aria-label="Jump to Clue Number"></div>
 
-          <!-- Active Clue Spotlight Banner -->
+          <!-- Clean Active Clue Bar -->
           <div id="active-clue-banner" class="active-clue-banner">
             <button id="btn-prev-clue" class="btn-nav-clue" type="button" aria-label="Previous Clue">◀</button>
 
             <div class="active-clue-num" id="spotlight-number">1</div>
-            <div class="active-clue-thumb-wrap" id="spotlight-thumb-wrap" title="Tap to enlarge picture">
+            <div class="active-clue-thumb-wrap hidden" id="spotlight-thumb-wrap" title="Tap to enlarge picture">
               <img id="spotlight-img" src="" alt="Selected clue illustration" />
-              <span class="thumb-zoom-hint" aria-hidden="true">🔍</span>
             </div>
             <div class="active-clue-copy">
-              <div class="spotlight-meta">
-                <span id="spotlight-type-badge" class="clue-mode-badge">🖼️ Picture Clue</span>
-                <span id="spotlight-dir-badge" class="clue-dir-badge">ACROSS • 6 letters</span>
-              </div>
+              <span id="spotlight-dir-badge" class="clue-dir-badge">ACROSS · 6</span>
               <p id="spotlight-question" class="spotlight-question">
-                Click any picture, question card, or square in the grid to start spelling!
+                Select a clue or square to start solving.
               </p>
-              <div id="spotlight-word-slots" class="spotlight-word-slots" aria-label="Active word letter boxes"></div>
             </div>
 
             <button id="btn-next-clue" class="btn-nav-clue" type="button" aria-label="Next Clue">▶</button>
           </div>
 
           <!-- Main Board Layout: Left Clues + Center Crossword Grid + Right Clues -->
-          <!-- On mobile, CSS orders .grid-center-column FIRST so the grid + keyboard are right under the active clue -->
           <div class="board-workspace">
             <div id="clues-col-left" class="clues-column" aria-label="Clues Part 1"></div>
 
@@ -216,49 +195,26 @@
                 <div id="crossword-grid" class="crossword-grid" role="grid" aria-label="Crossword Letters Grid"></div>
               </div>
 
-              <!-- Kid-Friendly On-Screen Alphabet Keypad (great for phones, tablets, and young kids) -->
-              <div id="virtual-keyboard" class="virtual-keyboard" aria-label="On-screen Letter Keypad"></div>
+              <!-- On-Screen Alphabet Keypad (auto-visible on mobile/tablet, toggleable on desktop) -->
+              <div id="virtual-keyboard" class="virtual-keyboard desktop-hidden" aria-label="On-screen Letter Keypad"></div>
             </div>
 
             <div id="clues-col-right" class="clues-column" aria-label="Clues Part 2"></div>
           </div>
         </section>
 
-        <!-- Tilted Cards Gallery of Ready-to-Play Themed Crosswords (Crosswords-for-Kids template style) -->
+        <!-- Clean Featured Crosswords Gallery -->
         <section id="themes-gallery-section" class="themes-gallery-section">
-          <h2 class="section-heading">🌟 Featured Picture &amp; Question Crosswords</h2>
-          <p class="section-sub">
-            Tap any themed card below to play right away, or type your own theme above (from Elementary to College level) to generate a brand-new AI puzzle!
-          </p>
+          <div class="gallery-header-row">
+            <h2 class="section-heading">Featured Crosswords</h2>
+            <p class="section-sub">Pick a ready-to-play theme or generate any custom topic above.</p>
+          </div>
           <div id="preset-cards-list" class="list"></div>
-        </section>
-
-        <!-- How to Play Section (modeled after Crosswords-For-Kids.com) -->
-        <section id="howplay" class="howplay-section">
-          <h2>How to Play This Online Word Puzzle?</h2>
-          <ul class="howplay-grid">
-            <li>
-              <span class="number">1</span>
-              Tap on a <strong>picture clue</strong>, <strong>number pill</strong>, or <strong>square</strong>, and enter the letters of the matching word! When you spell a word right, you’ll hear <em>"Yaaay!"</em> and see stars!
-            </li>
-            <li>
-              <span class="number orange">2</span>
-              Tap on the <strong>"Check Grid"</strong> button anytime to see if you made mistakes and highlight wrong letters in red.
-            </li>
-            <li>
-              <span class="number fushia">3</span>
-              Use the <strong>◀ / ▶ arrows</strong> or numbered pills to jump between clues, and tap any picture to zoom in!
-            </li>
-            <li>
-              <span class="number vert">4</span>
-              Choose your <strong>Difficulty Level</strong> (Elementary, Middle School, High School, or College) and type <strong>any topic</strong> in the generator box above!
-            </li>
-          </ul>
         </section>
       </main>
 
       <footer class="site-footer">
-        <p>Crosswords for Kids • Powered by Gemini Flash-Lite AI Illustrations &amp; Interactive Learning</p>
+        <p>Tip: Click an intersecting square twice to switch Across/Down, or press Tab to jump between clues.</p>
       </footer>
     </div>
 

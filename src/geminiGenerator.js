@@ -1,10 +1,20 @@
 /**
  * Gemini AI Generator for Crosswords
- * - Supports 4 difficulty tiers: Elementary (default), Middle School, High School, and College
- * - Prompts for mutually-intersecting crossword word webs (with extra candidate buffer so grids are 100% connected)
- * - Enforces strict validation so picture & question clues never leak or repeat the raw answer word string
+ * - Supports 5 difficulty tiers: Elementary (default), Middle School, High School, College, and Grandmaster (above College)
+ * - Enforces difficulty-specific word-length priors (shorter 3-4 letter words welcomed in Beginner; longer 9-16 letter words favored in Expert/Grandmaster)
+ * - Runs a two-stage Generation + Strict Spelling/Clue-Consistency Verification pass so horizontal & vertical clues never suffer from misspelled words or mismatched clues
+ * - Enforces strict anti-spoiler validation so picture & question clues never leak the raw answer word string
  * - Uses the backend's hardcoded cheapest Gemini Flash-Lite models (gemini-3.5-flash-lite + gemini-3.1-flash-lite-image)
  */
+
+import {
+  sanitizeWord,
+  isCleanSingleLexicalWord,
+  scoreWordLengthPrior,
+  WORD_LENGTH_PRIORS,
+  MIN_WORD_LENGTH,
+  MAX_WORD_LENGTH,
+} from './crosswordLayout.js';
 
 const PROXY_URL = '/api/gemini';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -15,49 +25,81 @@ export const DIFFICULTY_PROFILES = {
   elementary: {
     id: 'elementary',
     label: 'Elementary',
-    badge: '🌱 Elementary',
-    audience: 'Elementary school kids (ages 6–10, grades 1–5)',
+    badge: 'Elementary',
+    audience: 'Elementary school kids and beginners (ages 6–10, grades 1–5)',
     wordLengthRange: '3 to 8 letters',
+    lengthPriorGuidance:
+      'Favor shorter, approachable words (mean ~4.7 letters): include 2–4 crisp 3–4 letter words alongside 5–7 letter words, and avoid words longer than 8 letters.',
     vocabGuidance:
       'Use fun, familiar, concrete everyday words appropriate for elementary school children.',
     clueGuidance:
-      'Write a warm, playful, kid-friendly question or riddle clue (1 full sentence, 6–16 words) that clearly describes the concept without ever using the answer word.',
+      'Write a warm, playful, kid-friendly question or riddle clue (1 full sentence, 6–16 words) that clearly and unambiguously describes the exact answer word without ever using it.',
+    mixedImageRatioGuidance:
+      'a mix of "image" (about 65% of items, especially concrete visualizable nouns) and "question" (about 35% of items)',
     revealFirstLetterDefault: true,
   },
   middle: {
     id: 'middle',
     label: 'Middle School',
-    badge: '📘 Middle School',
+    badge: 'Middle School',
     audience: 'Middle school students (ages 11–13, grades 6–8)',
     wordLengthRange: '4 to 10 letters',
+    lengthPriorGuidance:
+      'Use balanced medium-length words (mean ~6.2 letters, mostly 5–8 letters with occasional 4-letter connectors or 9–10 letter anchors).',
     vocabGuidance:
       'Use intermediate middle-school vocabulary, curriculum concepts, science/history/literature terms, and engaging domain words.',
     clueGuidance:
-      'Write a clever, thought-provoking middle-school trivia or conceptual clue (1 sentence, 7–18 words) that requires middle-school subject knowledge without giving away the answer word.',
+      'Write a clever, clear middle-school trivia or conceptual clue (1 sentence, 7–18 words) that uniquely identifies the answer word without giving it away.',
+    mixedImageRatioGuidance:
+      'a mix of "image" (about 55% of items) and "question" (about 45% of items)',
     revealFirstLetterDefault: true,
   },
   high: {
     id: 'high',
     label: 'High School',
-    badge: '🎓 High School',
+    badge: 'High School',
     audience: 'High school students (ages 14–18, grades 9–12, AP / SAT level)',
-    wordLengthRange: '5 to 12 letters',
+    wordLengthRange: '5 to 13 letters',
+    lengthPriorGuidance:
+      'Favor medium-to-long academic words (mean ~7.8 letters, mostly 6–11 letters; avoid 3–4 letter filler words).',
     vocabGuidance:
       'Use challenging high-school, AP, and SAT-level vocabulary, precise terminology, and nuanced concepts related to the theme. Avoid overly basic child words.',
     clueGuidance:
-      'Write an analytical, indirect, high-school/AP-level clue or definition (1 concise sentence, 7–20 words) that tests deeper comprehension and avoids obvious surface synonyms.',
+      'Write an analytical, indirect high-school/AP-level clue or definition (1 concise sentence, 7–20 words) that tests deeper comprehension while uniquely pinning down the exact answer word.',
+    mixedImageRatioGuidance:
+      'a mix of "image" (about 45% of items) and "question" (about 55% of items)',
     revealFirstLetterDefault: false,
   },
   college: {
     id: 'college',
     label: 'College',
-    badge: '🏛️ College / Expert',
-    audience: 'College, graduate, and expert adult crossword solvers',
-    wordLengthRange: '5 to 14 letters',
+    badge: 'College',
+    audience: 'College, graduate, and seasoned adult crossword solvers',
+    wordLengthRange: '6 to 15 letters',
+    lengthPriorGuidance:
+      'Strong prior toward longer words (mean ~9.5 letters): the majority of words should be 8–14 letters long, with minimum 6 letters.',
     vocabGuidance:
-      'Use advanced, erudite, college/graduate-level vocabulary, technical domain terminology, and sophisticated lexicon. Make the vocabulary genuinely challenging!',
+      'Use advanced, erudite college/graduate-level vocabulary, technical domain terminology, and sophisticated lexicon. Make the vocabulary genuinely challenging.',
     clueGuidance:
-      'Write a sophisticated, oblique, NYT-late-week-style or scholarly crossword clue (6–20 words) using subtle wordplay, rigorous technical precision, or indirect allusion so the solver must think deeply.',
+      'Write a sophisticated, oblique NYT-Friday-style or scholarly clue (6–20 words) using subtle wordplay, rigorous technical precision, or indirect allusion that still resolves to a 100% unique, unmistakable answer.',
+    mixedImageRatioGuidance:
+      'a mix of "question" (about 65% of items) and "image" (about 35% symbolic/conceptual illustrations)',
+    revealFirstLetterDefault: false,
+  },
+  grandmaster: {
+    id: 'grandmaster',
+    label: 'Grandmaster',
+    badge: 'Grandmaster',
+    audience: 'Championship tournament crossword solvers, PhD/postdoctoral specialists, and polymaths',
+    wordLengthRange: '7 to 17 letters',
+    lengthPriorGuidance:
+      'Strong prior toward long polysyllabic words (mean ~11.2 letters): predominantly 9–16 letter specialist/scholarly words, minimum 7 letters, zero short filler words.',
+    vocabGuidance:
+      'Use extremely challenging, rare, PhD/research-grade terminology, arcane literary/philosophical/historical/scientific lexicon, and polysyllabic domain terms. Strictly forbid introductory, everyday, or textbook-101 words.',
+    clueGuidance:
+      'Write an ultra-challenging NYT-Saturday / Championship-tournament-caliber clue (7–22 words) featuring deep lateral framing, etymological or historical obliqueness, or multi-step conceptual synthesis — while remaining 100% factually exact so a master solver uniquely arrives at this exact word and spelling.',
+    mixedImageRatioGuidance:
+      'mostly "question" (about 80% of items) with at most 20% abstract/symbolic "image" clues that never visually give away a surface object',
     revealFirstLetterDefault: false,
   },
 };
@@ -89,7 +131,7 @@ export function setStoredApiKey(key) {
 async function callGemini(task, model, payload) {
   const userKey = getStoredApiKey();
   if (userKey) {
-    const res = await fetch(`${GEMINI_API_BASE}/${model}:generateContent?key=***}`, {
+    const res = await fetch(`${GEMINI_API_BASE}/${model}:generateContent?key=${encodeURIComponent(userKey)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -128,6 +170,10 @@ function extractJsonArray(rawText) {
   return null;
 }
 
+function isAdvancedDifficulty(profileId) {
+  return profileId === 'high' || profileId === 'college' || profileId === 'grandmaster';
+}
+
 /**
  * Strips any occurrence of the answer word (or simple plural) from a clue string
  * and guarantees that a bare word string is NEVER used as the clue text.
@@ -146,19 +192,15 @@ export function sanitizeAndValidateClueText(item, word, theme, difficultyProfile
     .trim();
 
   const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Match the answer word or its simple plural/possessive (case-insensitive)
   const wordRegex = new RegExp(`\\b${escapedWord}(?:S|ES|'S)?\\b`, 'gi');
 
   let cleaned = rawCandidate.replace(wordRegex, '_____').trim();
 
-  // Count how many actual non-blank words remain
   const meaningfulWords = cleaned
     .replace(/[^a-zA-Z\s]/g, ' ')
     .split(/\s+/)
     .filter((w) => w.length >= 2 && w.toUpperCase() !== word);
 
-  // If the model put only the word itself (e.g. "BULLDOZER") or a tiny 1-2 word label,
-  // try salvaging a spoiler-free description from imagePrompt, or construct a proper clue
   if (
     !cleaned ||
     cleaned.toUpperCase().replace(/[^A-Z]/g, '') === word ||
@@ -177,15 +219,13 @@ export function sanitizeAndValidateClueText(item, word, theme, difficultyProfile
 
     if (promptWords.length >= 4 && !promptSource.toUpperCase().includes(word)) {
       const capitalized = promptSource.charAt(0).toUpperCase() + promptSource.slice(1);
-      cleaned =
-        difficultyProfile?.id === 'college' || difficultyProfile?.id === 'high'
-          ? `Identify this ${theme} term: ${capitalized.replace(/\.$/, '')}.`
-          : `Which ${word.length}-letter ${theme} word matches this clue: ${capitalized.replace(/\.$/, '')}?`;
+      cleaned = isAdvancedDifficulty(difficultyProfile?.id)
+        ? `Identify this ${theme} term: ${capitalized.replace(/\.$/, '')}.`
+        : `Which ${word.length}-letter ${theme} word matches this clue: ${capitalized.replace(/\.$/, '')}?`;
     } else {
-      cleaned =
-        difficultyProfile?.id === 'college' || difficultyProfile?.id === 'high'
-          ? `Key ${word.length}-letter ${theme} term starting with "${word[0]}" and ending with "${word[word.length - 1]}".`
-          : `Look closely! Which ${word.length}-letter ${theme} word starts with "${word[0]}"?`;
+      cleaned = isAdvancedDifficulty(difficultyProfile?.id)
+        ? `Key ${word.length}-letter ${theme} term starting with "${word[0]}" and ending with "${word[word.length - 1]}".`
+        : `Look closely! Which ${word.length}-letter ${theme} word starts with "${word[0]}"?`;
     }
   }
 
@@ -193,51 +233,156 @@ export function sanitizeAndValidateClueText(item, word, theme, difficultyProfile
 }
 
 /**
+ * Stage-2 Verification Pass:
+ * Audits every candidate `{ word, questionClue }` at low temperature (0.1) to guarantee:
+ * 1. `word` is a real, canonically spelled single standard American English word (fixes any typo so crossing letters are 100% accurate).
+ * 2. `questionClue` uniquely, factually, and grammatically matches `word` (same singular/plural, tense, and part of speech; never confuses sister terms like MITOSIS/MEIOSIS or ENTROPY/ENTHALPY).
+ */
+async function verifyAndRepairPuzzleItems(candidates, theme, profile) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return candidates;
+
+  const compactInput = candidates.map((c, idx) => ({
+    index: idx,
+    word: c.word,
+    length: c.word.length,
+    questionClue: c.questionClue,
+  }));
+
+  const auditPrompt = `You are a strict crossword fact-checker and copy editor auditing entries for a "${theme}" crossword (${profile.label} difficulty).
+
+Review every candidate entry below and verify ALL FOUR rules:
+1. EXACT SPELLING & SINGLE WORD: "word" MUST be a real, 100% accurately spelled standard American English single word (A-Z letters only, NOT a multi-word phrase glued together, NOT hyphenated, NOT misspelled). Pay extreme attention to vowels and double consonants in scientific/scholarly words! If misspelled, provide the exact standard American spelling in "correctedWord". If it is a multi-word phrase or nonsense token, set "keep": false.
+2. UNIQUE 1-TO-1 CLUE CONSISTENCY: A knowledgeable solver reading "questionClue" and seeing the exact letter count MUST arrive uniquely at "word" — NEVER a sister term (e.g. mitosis vs meiosis, entropy vs enthalpy, stalactite vs stalagmite, fission vs fusion, abscissa vs ordinate), NEVER the scientist's surname when the word is the phenomenon (or vice versa).
+3. GRAMMATICAL AGREEMENT: "questionClue" MUST match "word" in exact part of speech, tense, and singular/plural number.
+4. NO SPOILERS: "verifiedClue" MUST NOT contain "word" (or its direct plural/inflection) and must be 6–22 words long.
+
+Entries to audit:
+${JSON.stringify(compactInput)}
+
+Return a JSON array with one object per input entry:
+- "index": matching input index
+- "keep": boolean (false ONLY if entry is irredeemably multi-word/invalid)
+- "correctedWord": exact uppercase A-Z standard American spelling of the single word
+- "verifiedClue": the original clue if already 100% exact and unambiguous, or a corrected clue that uniquely and unmistakably clues "correctedWord" at ${profile.label} level without containing "correctedWord".`;
+
+  try {
+    const payload = {
+      contents: [{ parts: [{ text: auditPrompt }] }],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              index: { type: 'INTEGER' },
+              keep: { type: 'BOOLEAN' },
+              correctedWord: { type: 'STRING' },
+              verifiedClue: { type: 'STRING' },
+            },
+            required: ['index', 'keep', 'correctedWord', 'verifiedClue'],
+          },
+        },
+      },
+    };
+
+    const res = await callGemini('text', TEXT_MODEL, payload);
+    if (!res.ok) return candidates;
+
+    const data = await res.json();
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    const textPart = parts.find((p) => typeof p.text === 'string' && p.text.trim()) || parts[0];
+    const audits = extractJsonArray(textPart?.text);
+    if (!Array.isArray(audits) || audits.length === 0) return candidates;
+
+    const auditByIndex = new Map(audits.map((a) => [Number(a.index), a]));
+    const seen = new Set();
+    const repaired = [];
+
+    candidates.forEach((orig, idx) => {
+      const audit = auditByIndex.get(idx);
+      if (audit && audit.keep === false) return;
+
+      const rawWord = audit?.correctedWord ? audit.correctedWord : orig.word;
+      if (!isCleanSingleLexicalWord(rawWord)) return;
+      const cleanWord = sanitizeWord(rawWord);
+      if (cleanWord.length < MIN_WORD_LENGTH || cleanWord.length > MAX_WORD_LENGTH || seen.has(cleanWord)) {
+        return;
+      }
+      seen.add(cleanWord);
+
+      const updatedClueSource = {
+        ...orig,
+        questionClue: audit?.verifiedClue || orig.questionClue,
+      };
+      const finalClue = sanitizeAndValidateClueText(updatedClueSource, cleanWord, theme, profile);
+
+      repaired.push({
+        ...orig,
+        word: cleanWord,
+        questionClue: finalClue,
+      });
+    });
+
+    // Only accept repaired list if it retained enough candidates to form a full puzzle
+    if (repaired.length >= Math.min(5, candidates.length)) {
+      return repaired;
+    }
+  } catch (err) {
+    console.warn('Stage-2 clue consistency verification skipped:', err);
+  }
+
+  return candidates;
+}
+
+/**
  * Generates a themed crossword word & clue candidate list using Gemini.
- * Requests extra candidate words (clueCount + 5) engineered to share common bridge letters
- * so `buildCrosswordLayout(items, clueCount)` always forms a 100% connected grid!
+ * Requests extra candidate words (clueCount + 6) engineered to share common bridge letters
+ * and follow difficulty-specific word-length priors.
  */
 export async function generateThemedPuzzleItems(theme, options = {}) {
   const clueCount = Math.min(10, Math.max(5, Number(options.clueCount) || 7));
-  const candidatePoolSize = clueCount + 5; // Extra candidates ensure 100% grid connectivity
-  const clueStyle = options.clueStyle || 'mixed'; // 'mixed' | 'images' | 'questions'
+  const candidatePoolSize = clueCount + 6;
+  const clueStyle = options.clueStyle || 'mixed';
   const profile = getDifficultyProfile(options.difficulty || 'elementary');
+  const prior = WORD_LENGTH_PRIORS[profile.id] || WORD_LENGTH_PRIORS.elementary;
 
   const prompt = `Design a tightly interconnected crossword puzzle word and clue list around the theme: "${theme}".
 
 TARGET DIFFICULTY LEVEL: ${profile.label.toUpperCase()} (${profile.audience})
 - Vocabulary Level: ${profile.vocabGuidance}
-- Word Length Range: ${profile.wordLengthRange}
+- Word Length Range: ${profile.wordLengthRange} (strict bounds: ${prior.minLength}–${prior.maxLength} letters; target mean ~${prior.targetMean} letters)
+- Word Length Prior: ${profile.lengthPriorGuidance}
 - Clue Writing Style: ${profile.clueGuidance}
 
-Return ${candidatePoolSize} candidate items as a JSON array (ordered with the best ${clueCount} interconnected words first, plus 5 backup words that bridge with them).
+Return ${candidatePoolSize} candidate items as a JSON array (ordered with the best ${clueCount} interconnected words matching the word-length prior first, plus 6 bridgeable backup words).
 
-CRITICAL CROSSWORD INTERCONNECTIVITY RULES (TO PREVENT DISCONNECTED WORDS):
-1. Single English words only (A-Z uppercase letters only, no spaces, no hyphens, no numbers).
-2. Design the words as a MUTUALLY INTERSECTING WEB: every word MUST share at least 3 common crossword bridge letters (especially E, A, R, I, O, T, N, S, L, C) with at least 4 other words in your list.
-3. NEVER include isolated words made mostly of rare consonants (J, Q, X, Z, K, V, W) that fail to cross other words.
-4. Vary word lengths across the range (${profile.wordLengthRange}) so long anchor words can cross multiple medium/short words cleanly.
+CRITICAL SPELLING, CONSISTENCY & INTERCONNECTIVITY RULES:
+1. SINGLE CANONICAL WORDS ONLY: Every "word" MUST be a single, unhyphenated, accurately spelled standard American English word (A-Z uppercase letters only, NO spaces, NO hyphens, NO numbers, NO multi-word phrases glued together, NO typos). Double-check every vowel and consonant in technical/scholarly words!
+2. STRICT 1-TO-1 CLUE ACCURACY: Each "questionClue" MUST uniquely, factually, and grammatically match its exact "word" (matching singular/plural, tense, and part of speech). Never confuse sister concepts (e.g. mitosis vs meiosis, entropy vs enthalpy) or person vs phenomenon.
+3. MUTUALLY INTERSECTING WEB: Every word MUST share at least 3 common crossword bridge letters (E, A, R, I, O, T, N, S, L, C) with at least 4 other words in your list so the grid connects cleanly.
+4. RESPECT WORD LENGTH PRIORS: Follow "${profile.lengthPriorGuidance}".
 
-CRITICAL CLUE QUALITY & ANTI-SPOILER RULES:
-1. Every item (BOTH "image" and "question" clue types!) MUST have a complete, descriptive "questionClue" (at least 6 words long).
-2. NEVER set "questionClue" to the answer word itself! For example, if "word" is "BULLDOZER", "questionClue" must NEVER be "Bulldozer" or "BULLDOZER".
-3. NEVER include the answer "word" (or its plural/root) anywhere inside "questionClue"! Even when "clueType" is "image", "questionClue" is displayed right next to the picture and MUST be a genuine riddle, question, or definition that does not name the answer word.
-4. Every item MUST include:
-   - "word": uppercase word (A-Z only)
-   - "questionClue": a complete sentence clue/riddle/definition (6–20 words) that NEVER contains "word"
-   - "imagePrompt": a concrete visual scene or symbolic illustration description of the concept (without any text or letters)
+CRITICAL ANTI-SPOILER & FORMAT RULES:
+1. Every item (BOTH "image" and "question" clue types!) MUST have a complete, descriptive "questionClue" (6–22 words long).
+2. NEVER set "questionClue" to the answer word itself, and NEVER include "word" (or its plural/inflection) anywhere inside "questionClue".
+3. Every item MUST include:
+   - "word": uppercase single English word (A-Z only)
+   - "questionClue": a complete clue/riddle/definition (6–22 words) that uniquely clues "word" without containing "word"
+   - "imagePrompt": a concrete visual or symbolic illustration description (with zero text, letters, or numbers)
    - "clueType": ${
      clueStyle === 'images'
        ? '"image" for all items'
        : clueStyle === 'questions'
        ? '"question" for all items'
-       : 'a mix of "image" (about 60% of items, especially visualizable nouns/concepts) and "question" (about 40% of items)'
+       : profile.mixedImageRatioGuidance
    }`;
 
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
-      temperature: profile.id === 'college' || profile.id === 'high' ? 0.65 : 0.6,
+      temperature: isAdvancedDifficulty(profile.id) ? 0.55 : 0.5,
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'ARRAY',
@@ -278,10 +423,9 @@ CRITICAL CLUE QUALITY & ANTI-SPOILER RULES:
   const validatedItems = [];
 
   parsed.forEach((item, idx) => {
-    const word = String(item.word || '')
-      .toUpperCase()
-      .replace(/[^A-Z]/g, '');
-    if (word.length < 2 || word.length > 15 || seenWords.has(word)) return;
+    if (!isCleanSingleLexicalWord(item?.word)) return;
+    const word = sanitizeWord(item.word);
+    if (word.length < MIN_WORD_LENGTH || word.length > MAX_WORD_LENGTH || seenWords.has(word)) return;
     seenWords.add(word);
 
     let clueType = item.clueType;
@@ -306,7 +450,17 @@ CRITICAL CLUE QUALITY & ANTI-SPOILER RULES:
     throw new Error('No valid words returned from AI model.');
   }
 
-  return validatedItems;
+  // Stage 2: Audit canonical spelling and 1-to-1 clue/answer consistency
+  const verifiedItems = await verifyAndRepairPuzzleItems(validatedItems, theme, profile);
+
+  // Order candidates by difficulty word-length prior (stable tie-break) so preferred lengths anchor first
+  verifiedItems.sort(
+    (a, b) =>
+      scoreWordLengthPrior(b.word.length, profile.id) -
+      scoreWordLengthPrior(a.word.length, profile.id)
+  );
+
+  return verifiedItems;
 }
 
 /**
@@ -315,7 +469,7 @@ CRITICAL CLUE QUALITY & ANTI-SPOILER RULES:
  */
 export async function generateClueIllustration(item, theme = '') {
   const subject = item.imagePrompt || item.questionClue || theme;
-  const prompt = `Cute, vibrant, friendly vector illustration of: ${subject} (Theme: ${theme}). Centered single subject on a clean soft white background, bold outlines, joyful colors, high contrast, easy to recognize immediately. CRITICAL: NO text, NO words, NO letters, NO numbers anywhere in the image.`;
+  const prompt = `Clean, vibrant vector illustration of: ${subject} (Theme: ${theme}). Centered single subject on a clean soft white background, crisp lines, high contrast, easy to recognize. CRITICAL: NO text, NO words, NO letters, NO numbers anywhere in the image.`;
 
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],

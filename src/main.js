@@ -1,15 +1,12 @@
 /**
- * Main Application Controller for Crosswords for Kids
- * - Renders 100% connected crossword grids (5-10 clues) with Crosswords-for-Kids.com styling
- * - Supports 4 difficulty levels: Elementary (default), Middle School, High School, and College
- * - Supports both AI-generated Picture Clues and Question/Riddle Clues with spoiler-free validation
- * - Allows user-specified custom themes with real-time Gemini Flash-Lite AI word/clue & image generation
- * - Plays "Yaaay!" sound effects + minimal sparkle animation on each solved clue
- * - Plays grand victory fanfare + full-screen fireworks/confetti animation on solving the puzzle
- * - Fully optimized for mobile phones and tablets (responsive grid sizing, 1-tap clue pills, tap-to-zoom pictures)
+ * Main Application Controller for Crosswords
+ * - Renders 100% connected, invariant-verified crossword grids (5-10 clues)
+ * - Supports 5 difficulty levels: Elementary (default), Middle School, High School, College, and Grandmaster
+ * - Applies difficulty-aware word length priors (shorter beginner words vs. longer expert/grandmaster words)
+ * - Clean, decluttered interface on both desktop and mobile viewports
  */
 
-import { buildCrosswordLayout } from './crosswordLayout.js';
+import { buildCrosswordLayout, assertValidCrosswordLayout } from './crosswordLayout.js';
 import { PRESET_PUZZLES } from './presets.js';
 import {
   generateThemedPuzzleItems,
@@ -35,12 +32,14 @@ const PRESET_ICONS = {
 const state = {
   currentPuzzleMeta: null,
   layout: null,
-  userGrid: [], // 2D array of entered uppercase letters
+  userGrid: [], // 2D array of entered uppercase letters (single source of truth per (r,c))
+  prefilledCells: new Set(), // keys "r,c" pre-populated by First-Letter helper or Hint
   wrongCells: new Set(), // keys "r,c"
   solvedWordIds: new Set(),
   activeWordId: null,
   focusedCell: null, // { row, col }
   revealFirstLetter: true,
+  showDesktopKeyboard: false,
   stopVictoryFn: null,
   isGenerating: false,
   generationRunId: 0,
@@ -51,6 +50,7 @@ const state = {
 const els = {
   soundToggleBtn: document.getElementById('btn-sound-toggle'),
   firstLetterToggleBtn: document.getElementById('btn-first-letter-toggle'),
+  keyboardToggleBtn: document.getElementById('btn-keyboard-toggle'),
   browseThemesBtn: document.getElementById('btn-Browse-themes'),
   generatorCard: document.getElementById('theme-generator-card'),
   toggleGeneratorBtn: document.getElementById('btn-toggle-generator'),
@@ -76,10 +76,8 @@ const els = {
   spotlightNumber: document.getElementById('spotlight-number'),
   spotlightThumbWrap: document.getElementById('spotlight-thumb-wrap'),
   spotlightImg: document.getElementById('spotlight-img'),
-  spotlightTypeBadge: document.getElementById('spotlight-type-badge'),
   spotlightDirBadge: document.getElementById('spotlight-dir-badge'),
   spotlightQuestion: document.getElementById('spotlight-question'),
-  spotlightWordSlots: document.getElementById('spotlight-word-slots'),
   prevClueBtn: document.getElementById('btn-prev-clue'),
   nextClueBtn: document.getElementById('btn-next-clue'),
   cluesColLeft: document.getElementById('clues-col-left'),
@@ -106,12 +104,13 @@ function initApp() {
   renderQuickPresetsStrip();
   renderPresetGallery();
   syncMobileGeneratorCollapseState();
+  syncDesktopKeyboardVisibility();
   bindEvents();
 
   // Load default preset ("Baby Animals Crossword")
   loadPuzzle(PRESET_PUZZLES[0]);
 
-  // Expose helper for automated testing & quick inspection
+  // Expose helper for automated testing & inspection
   window.__KIDS_XW__ = {
     getState: () => state,
     loadPresetById: (id) => {
@@ -141,11 +140,11 @@ function syncMobileGeneratorCollapseState() {
   if (isMobileViewport() && state.generatorCollapsedOnMobile) {
     els.generatorCard.classList.add('mobile-collapsed');
     els.toggleGeneratorBtn.setAttribute('aria-expanded', 'false');
-    els.toggleGeneratorBtn.textContent = '🪄 Custom AI Theme ▾';
+    els.toggleGeneratorBtn.textContent = 'Create Theme ▾';
   } else {
     els.generatorCard.classList.remove('mobile-collapsed');
     els.toggleGeneratorBtn.setAttribute('aria-expanded', 'true');
-    els.toggleGeneratorBtn.textContent = isMobileViewport() ? '✕ Hide AI Builder ▴' : '🪄 Custom AI Theme';
+    els.toggleGeneratorBtn.textContent = isMobileViewport() ? 'Hide ▴' : 'Create Theme';
   }
 }
 
@@ -158,12 +157,20 @@ function toggleMobileGenerator(forceOpen) {
   syncMobileGeneratorCollapseState();
 }
 
+function syncDesktopKeyboardVisibility() {
+  if (!els.virtualKeyboard) return;
+  els.virtualKeyboard.classList.toggle('desktop-hidden', !state.showDesktopKeyboard);
+  if (els.keyboardToggleBtn) {
+    els.keyboardToggleBtn.classList.toggle('active', state.showDesktopKeyboard);
+  }
+}
+
 function setFirstLetterHintState(enabled) {
   state.revealFirstLetter = Boolean(enabled);
   if (els.firstLetterToggleBtn) {
     els.firstLetterToggleBtn.textContent = state.revealFirstLetter
-      ? '🔤 First Letter: ON'
-      : '🔤 First Letter: OFF';
+      ? 'First Letter: ON'
+      : 'First Letter: OFF';
     els.firstLetterToggleBtn.classList.toggle('active', state.revealFirstLetter);
   }
 }
@@ -183,7 +190,7 @@ function closeImageZoom() {
 function bindEvents() {
   els.soundToggleBtn.addEventListener('click', () => {
     const muted = soundFx.toggleMute();
-    els.soundToggleBtn.textContent = muted ? '🔇 Sound: OFF' : '🔊 Sound: ON';
+    els.soundToggleBtn.textContent = muted ? 'Sound: OFF' : 'Sound: ON';
     els.soundToggleBtn.classList.toggle('active', !muted);
   });
 
@@ -193,6 +200,13 @@ function bindEvents() {
       resetCurrentPuzzle();
     }
   });
+
+  if (els.keyboardToggleBtn) {
+    els.keyboardToggleBtn.addEventListener('click', () => {
+      state.showDesktopKeyboard = !state.showDesktopKeyboard;
+      syncDesktopKeyboardVisibility();
+    });
+  }
 
   els.browseThemesBtn.addEventListener('click', () => {
     els.themesGallerySection.scrollIntoView({ behavior: 'smooth' });
@@ -209,19 +223,6 @@ function bindEvents() {
     const customTheme = els.themeInput.value.trim();
     if (!customTheme || state.isGenerating) return;
     await handleGenerateCustomTheme(customTheme);
-  });
-
-  document.querySelectorAll('[data-quick-theme]').forEach((chip) => {
-    chip.addEventListener('click', async () => {
-      const theme = chip.getAttribute('data-quick-theme');
-      const quickDiff = chip.getAttribute('data-quick-difficulty');
-      if (!theme || state.isGenerating) return;
-      els.themeInput.value = theme;
-      if (quickDiff && els.difficultySelect) {
-        els.difficultySelect.value = quickDiff;
-      }
-      await handleGenerateCustomTheme(theme);
-    });
   });
 
   els.prevClueBtn.addEventListener('click', () => cycleActiveWord(-1));
@@ -265,10 +266,8 @@ function bindEvents() {
 }
 
 /**
- * Loads a puzzle object ({ id, title, theme, difficultyLevel?, targetClueCount?, items })
- * and builds the connected crossword layout.
- * IMPORTANT: Renders the new board DOM BEFORE selecting/highlighting cells so that
- * switching from a larger grid to a smaller grid never indexes stale DOM coordinates!
+ * Loads a puzzle object ({ id, title, theme, difficultyLevel?, targetClueCount?, items }),
+ * builds the difficulty-prioritized connected crossword layout, and verifies all crossing invariants.
  */
 export function loadPuzzle(puzzleMeta) {
   closeVictoryOverlay();
@@ -276,34 +275,39 @@ export function loadPuzzle(puzzleMeta) {
 
   state.currentPuzzleMeta = JSON.parse(JSON.stringify(puzzleMeta));
   const targetCount = state.currentPuzzleMeta.targetClueCount || 10;
-  state.layout = buildCrosswordLayout(state.currentPuzzleMeta.items, targetCount);
+  const difficulty = state.currentPuzzleMeta.difficultyLevel || 'elementary';
+
+  state.layout = buildCrosswordLayout(state.currentPuzzleMeta.items, targetCount, { difficulty });
+  assertValidCrosswordLayout(state.layout);
+
   state.solvedWordIds.clear();
   state.wrongCells.clear();
+  state.prefilledCells.clear();
   state.activeWordId = null;
   state.focusedCell = null;
 
-  // Initialize userGrid
+  // Initialize userGrid from canonical layout dimensions
   state.userGrid = Array.from({ length: state.layout.rows }, () =>
     Array.from({ length: state.layout.cols }, () => '')
   );
 
-  // If revealFirstLetter is enabled, pre-populate the first letter of each word
+  // Pre-populate first letters strictly from canonical cell.solution so crossings can never diverge
   if (state.revealFirstLetter) {
     for (const w of state.layout.words) {
-      state.userGrid[w.row][w.col] = w.word[0];
+      const canonicalChar = state.layout.cells[w.row][w.col].solution;
+      state.userGrid[w.row][w.col] = canonicalChar;
+      state.prefilledCells.add(`${w.row},${w.col}`);
     }
   }
 
-  const diffProfile = getDifficultyProfile(state.currentPuzzleMeta.difficultyLevel || 'elementary');
-  els.activeThemePill.textContent = `Theme: ${state.currentPuzzleMeta.theme} • ${diffProfile.badge}`;
+  const diffProfile = getDifficultyProfile(difficulty);
+  els.activeThemePill.textContent = `${state.currentPuzzleMeta.theme} · ${diffProfile.badge}`;
   els.activePuzzleTitle.textContent = state.currentPuzzleMeta.title;
   els.totalWordCount.textContent = String(state.layout.words.length);
   els.solvedCount.textContent = '0';
 
-  // Render the new grid and clue cards FIRST so DOM matches state.layout
   renderBoard();
 
-  // Then select the first word and its first empty cell
   if (state.layout.words.length > 0) {
     selectWord(state.layout.words[0].id, false);
   }
@@ -330,8 +334,8 @@ async function handleGenerateCustomTheme(theme) {
   const clueStyle = els.clueStyleSelect.value || 'mixed';
 
   els.loadingBanner.classList.remove('hidden');
-  els.loadingTitle.textContent = `Designing "${theme}" (${diffProfile.label}) Crossword...`;
-  els.loadingDetail.textContent = `Asking Gemini Flash-Lite for interconnected ${diffProfile.label.toLowerCase()} vocabulary & clues...`;
+  els.loadingTitle.textContent = `Building "${theme}" (${diffProfile.label})...`;
+  els.loadingDetail.textContent = `Generating & verifying ${diffProfile.label.toLowerCase()} vocabulary, clues, and intersections...`;
 
   try {
     const items = await generateThemedPuzzleItems(theme, {
@@ -341,7 +345,6 @@ async function handleGenerateCustomTheme(theme) {
     });
     if (runId !== state.generationRunId) return;
 
-    // Prepare temporary spoiler-free placeholder stickers while AI images stream in
     items.forEach((item) => {
       if (item.clueType !== 'question' && !item.imageUrl) {
         item.imageUrl = createFallbackStickerDataUrl(item);
@@ -349,7 +352,6 @@ async function handleGenerateCustomTheme(theme) {
       }
     });
 
-    // Adjust First Letter Hint default based on difficulty level (Elementary/Middle -> ON, High/College -> OFF)
     setFirstLetterHintState(diffProfile.revealFirstLetterDefault);
 
     const customPuzzle = {
@@ -361,29 +363,25 @@ async function handleGenerateCustomTheme(theme) {
       items,
     };
 
-    // Collapse generator on mobile so the newly created puzzle is front and center
     if (isMobileViewport()) {
       toggleMobileGenerator(false);
     }
 
-    // Render the playable crossword immediately so the player can start right away
     loadPuzzle(customPuzzle);
     document.getElementById('puzzle-stage')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    // Now generate the AI cartoon illustrations for the placed picture clues!
     const itemsToIllustrate = state.layout.words.filter((w) => w.clueType !== 'question');
     if (itemsToIllustrate.length > 0) {
-      els.loadingTitle.textContent = `Painting AI Illustrations for "${theme}"...`;
-      els.loadingDetail.textContent = `Generating picture 1 of ${itemsToIllustrate.length}...`;
+      els.loadingTitle.textContent = `Illustrating "${theme}"...`;
+      els.loadingDetail.textContent = `Painting picture 1 of ${itemsToIllustrate.length}...`;
 
       await generatePuzzleIllustrations(
         itemsToIllustrate,
         theme,
         (updatedItem, dataUrl, doneCount, totalCount) => {
           if (runId !== state.generationRunId) return;
-          els.loadingDetail.textContent = `Painted ${doneCount} of ${totalCount} AI illustrations...`;
+          els.loadingDetail.textContent = `Painted ${doneCount} of ${totalCount} illustrations...`;
 
-          // Persist generated image into currentPuzzleMeta so Reset / First-Letter toggle preserves it
           const metaItem = state.currentPuzzleMeta?.items?.find(
             (it) => it.word.toUpperCase() === updatedItem.word.toUpperCase()
           );
@@ -392,7 +390,6 @@ async function handleGenerateCustomTheme(theme) {
             metaItem._needsAiImage = false;
           }
 
-          // Update image in live DOM
           const cardImg = document.querySelector(
             `[data-clue-word-id="${updatedItem.id}"] .clue-visual-box img`
           );
@@ -428,14 +425,32 @@ function getWordCoordinates(wordObj) {
   const dr = wordObj.direction === 'down' ? 1 : 0;
   const dc = wordObj.direction === 'across' ? 1 : 0;
   for (let i = 0; i < wordObj.word.length; i++) {
+    const row = wordObj.row + dr * i;
+    const col = wordObj.col + dc * i;
+    const canonicalSolution = state.layout?.cells?.[row]?.[col]?.solution || wordObj.word[i];
     coords.push({
-      row: wordObj.row + dr * i,
-      col: wordObj.col + dc * i,
+      row,
+      col,
       index: i,
-      solution: wordObj.word[i],
+      solution: canonicalSolution,
     });
   }
   return coords;
+}
+
+/**
+ * Returns true if `(row, col)` already holds a verified/confirmed letter
+ * (either part of an already-solved crossing word or a pre-filled hint letter),
+ * so cursor navigation skips confirmed crossings while still stepping onto
+ * unverified/wrong guesses that the solver may need to overwrite.
+ */
+function isCellConfirmedCorrect(row, col) {
+  const current = state.userGrid[row]?.[col];
+  if (!current) return false;
+  const cell = state.layout?.cells?.[row]?.[col];
+  if (!cell || current !== cell.solution) return false;
+  if (state.prefilledCells.has(`${row},${col}`)) return true;
+  return cell.wordIds.some((id) => state.solvedWordIds.has(id));
 }
 
 function selectWord(wordId, playSound = true) {
@@ -446,9 +461,8 @@ function selectWord(wordId, playSound = true) {
   state.activeWordId = wordObj.id;
   const coords = getWordCoordinates(wordObj);
 
-  // Pick first empty cell in this word, or the first cell if all filled
-  const firstEmpty = coords.find((c) => !state.userGrid[c.row]?.[c.col]);
-  const target = firstEmpty || coords[0];
+  const firstUnconfirmed = coords.find((c) => !isCellConfirmedCorrect(c.row, c.col));
+  const target = firstUnconfirmed || coords[0];
   state.focusedCell = { row: target.row, col: target.col };
 
   if (playSound) {
@@ -467,10 +481,6 @@ function cycleActiveWord(delta) {
   selectWord(words[nextIdx].id, true);
 }
 
-/**
- * Dynamically calculates and applies the optimal --cell-size so that the entire
- * crossword grid fits comfortably inside the viewport width on mobile and desktop.
- */
 function updateGridCellSize() {
   if (!state.layout || !els.crosswordGrid) return;
   const { rows, cols } = state.layout;
@@ -478,15 +488,16 @@ function updateGridCellSize() {
 
   const wrapperWidth =
     els.crosswordGridWrapper?.clientWidth ||
-    Math.min(window.innerWidth - 28, 640);
+    Math.min(window.innerWidth - 28, 680);
 
   const gap = window.innerWidth <= 600 ? 2 : 3;
   const gridPadding = 12;
   const maxAvailableCellWidth = Math.floor((wrapperWidth - gridPadding - (cols - 1) * gap) / cols);
 
-  let desktopIdeal = maxDim > 13 ? 34 : maxDim > 11 ? 38 : maxDim > 9 ? 44 : 50;
+  let desktopIdeal =
+    maxDim > 18 ? 28 : maxDim > 15 ? 32 : maxDim > 12 ? 36 : maxDim > 9 ? 42 : 48;
   if (window.innerWidth <= 600) {
-    desktopIdeal = maxDim > 10 ? 34 : maxDim > 8 ? 38 : 42;
+    desktopIdeal = maxDim > 12 ? 28 : maxDim > 9 ? 34 : 40;
   }
 
   const cellSize = Math.max(20, Math.min(desktopIdeal, maxAvailableCellWidth));
@@ -495,9 +506,6 @@ function updateGridCellSize() {
   els.crosswordGrid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
 }
 
-/**
- * Renders the Crossword Grid, Quick Clue Jump Pills, and Left/Right Clue Columns
- */
 function renderBoard() {
   if (!state.layout) return;
   const { rows, cols, cells, words } = state.layout;
@@ -515,20 +523,16 @@ function renderBoard() {
       if (!cellData.active) {
         cellEl.className = 'xw-cell empty';
       } else {
-        cellEl.className = 'xw-cell letter-cell';
+        const hasStartNum = cellData.startNumbers.length > 0;
+        cellEl.className = `xw-cell letter-cell${hasStartNum ? ' has-start-num' : ''}`;
         cellEl.setAttribute('role', 'gridcell');
         cellEl.setAttribute('aria-label', `Row ${r + 1} Column ${c + 1}`);
 
-        if (cellData.startNumbers.length > 0) {
-          const badgeWrap = document.createElement('div');
-          badgeWrap.className = 'cell-num-badges';
-          for (const sn of cellData.startNumbers) {
-            const b = document.createElement('span');
-            b.className = 'cell-num-bubble';
-            b.textContent = `${sn.number}`;
-            badgeWrap.appendChild(b);
-          }
-          cellEl.appendChild(badgeWrap);
+        if (hasStartNum) {
+          const numSpan = document.createElement('span');
+          numSpan.className = 'cell-corner-num';
+          numSpan.textContent = cellData.startNumbers.map((sn) => sn.number).join('/');
+          cellEl.appendChild(numSpan);
         }
 
         const charSpan = document.createElement('span');
@@ -543,10 +547,8 @@ function renderBoard() {
     }
   }
 
-  // Render 1-tap Clue Jump Bar (1..N)
   renderClueJumpBar(words);
 
-  // Split clues evenly between left and right columns (like Crosswords-for-Kids picture frame)
   els.cluesColLeft.innerHTML = '';
   els.cluesColRight.innerHTML = '';
   const half = Math.ceil(words.length / 2);
@@ -568,19 +570,13 @@ function renderClueJumpBar(words) {
   if (!els.clueJumpBar) return;
   els.clueJumpBar.innerHTML = '';
 
-  const label = document.createElement('span');
-  label.className = 'clue-jump-label';
-  label.textContent = 'Clues:';
-  els.clueJumpBar.appendChild(label);
-
   words.forEach((w) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'clue-jump-pill';
     btn.dataset.jumpWordId = w.id;
-    const icon = w.clueType === 'question' ? '❓' : '🖼️';
-    btn.innerHTML = `<span class="jump-num">${w.number}</span><span class="jump-icon">${icon}</span>`;
-    btn.title = `Clue ${w.number}: ${w.questionClue}`;
+    btn.innerHTML = `<span class="jump-num">${w.number}</span>`;
+    btn.title = `Clue ${w.number} (${w.direction}): ${w.questionClue}`;
     btn.addEventListener('click', () => {
       selectWord(w.id, true);
     });
@@ -590,30 +586,24 @@ function renderClueJumpBar(words) {
 
 function createClueCardElement(wordObj) {
   const card = document.createElement('div');
-  card.className = 'clue-card';
+  const isQuestionOnly = wordObj.clueType === 'question';
+  card.className = `clue-card${isQuestionOnly ? ' text-only-clue' : ''}`;
   card.dataset.clueWordId = wordObj.id;
 
-  const isQuestionOnly = wordObj.clueType === 'question';
-  const dirLabel = wordObj.direction === 'across' ? 'Across →' : 'Down ↓';
+  const dirLabel = wordObj.direction === 'across' ? 'Across' : 'Down';
 
   card.innerHTML = `
-    <div class="solved-check-stamp" title="Solved!">✓</div>
     <div class="clue-number-badge">${wordObj.number}</div>
     ${
       isQuestionOnly
-        ? `<div class="clue-question-icon-box" aria-hidden="true">❓</div>`
-        : `<div class="clue-visual-box" title="Tap to select or zoom">
-             <img src="${wordObj.imageUrl || createFallbackStickerDataUrl(wordObj)}" alt="Clue ${wordObj.number} picture" loading="lazy" />
+        ? ''
+        : `<div class="clue-visual-box" title="Tap to select or enlarge">
+             <img src="${wordObj.imageUrl || createFallbackStickerDataUrl(wordObj)}" alt="Clue ${wordObj.number} illustration" loading="lazy" />
            </div>`
     }
     <div class="clue-body">
-      <span class="clue-card-tag ${isQuestionOnly ? 'is-question' : ''}">
-        ${isQuestionOnly ? '❓ Question Clue' : '🖼️ AI Picture Clue'} • ${dirLabel}
-      </span>
+      <span class="clue-card-tag">${dirLabel} · ${wordObj.word.length}</span>
       <p class="clue-text">${wordObj.questionClue}</p>
-      <div class="clue-word-slots" data-slots-for="${wordObj.id}">
-        ${formatWordSlotsPreview(wordObj)}
-      </div>
     </div>
   `;
 
@@ -635,22 +625,11 @@ function createClueCardElement(wordObj) {
   return card;
 }
 
-function formatWordSlotsPreview(wordObj) {
-  const coords = getWordCoordinates(wordObj);
-  return coords
-    .map((c) => {
-      const ch = state.userGrid[c.row]?.[c.col];
-      return ch ? ch : '_';
-    })
-    .join(' ');
-}
-
 function handleCellClick(row, col) {
   if (!state.layout) return;
   const cellData = state.layout.cells[row]?.[col];
   if (!cellData || !cellData.active) return;
 
-  // If clicking the already focused cell and it belongs to 2 words, toggle direction!
   if (
     state.focusedCell &&
     state.focusedCell.row === row &&
@@ -675,7 +654,6 @@ function handlePhysicalKeyDown(e) {
     return;
   }
 
-  // Ignore if typing inside the theme generator input
   if (
     document.activeElement &&
     ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)
@@ -725,8 +703,8 @@ function handlePhysicalKeyDown(e) {
 
 function moveFocusByDelta(dr, dc) {
   if (!state.layout || !state.focusedCell) return;
-  let r = state.focusedCell.row + dr;
-  let c = state.focusedCell.col + dc;
+  const r = state.focusedCell.row + dr;
+  const c = state.focusedCell.col + dc;
   if (r >= 0 && r < state.layout.rows && c >= 0 && c < state.layout.cols) {
     const target = state.layout.cells[r]?.[c];
     if (target && target.active) {
@@ -735,19 +713,20 @@ function moveFocusByDelta(dr, dc) {
   }
 }
 
-function handleLetterInput(letter) {
+function handleLetterInput(letter, isHint = false) {
   if (!state.layout || !state.focusedCell) return;
   const { row, col } = state.focusedCell;
   if (!state.userGrid[row]) return;
 
   state.userGrid[row][col] = letter;
+  if (isHint) {
+    state.prefilledCells.add(`${row},${col}`);
+  }
   state.wrongCells.delete(`${row},${col}`);
   soundFx.playKeyClick();
 
-  // Advance focus to next cell in active word
   advanceCursorInActiveWord(1);
 
-  // Check if any word was just completed!
   evaluateSolvedWords(true);
   updateBoardHighlights();
   updateSpotlightBanner();
@@ -760,12 +739,14 @@ function handleBackspaceInput() {
 
   if (state.userGrid[row][col]) {
     state.userGrid[row][col] = '';
+    state.prefilledCells.delete(`${row},${col}`);
     state.wrongCells.delete(`${row},${col}`);
   } else {
     advanceCursorInActiveWord(-1);
     const prev = state.focusedCell;
     if (state.userGrid[prev.row]) {
       state.userGrid[prev.row][prev.col] = '';
+      state.prefilledCells.delete(`${prev.row},${prev.col}`);
       state.wrongCells.delete(`${prev.row},${prev.col}`);
     }
   }
@@ -786,10 +767,12 @@ function advanceCursorInActiveWord(step) {
   if (idx === -1) return;
 
   if (step > 0) {
-    // Prefer next empty cell in this word, otherwise just step + 1
-    const nextEmpty = coords.slice(idx + 1).find((c) => !state.userGrid[c.row]?.[c.col]);
-    if (nextEmpty) {
-      state.focusedCell = { row: nextEmpty.row, col: nextEmpty.col };
+    // Advance past confirmed/solved crossing squares, but DO step onto empty OR unverified tentative squares
+    const nextTarget = coords
+      .slice(idx + 1)
+      .find((c) => !state.userGrid[c.row]?.[c.col] || !isCellConfirmedCorrect(c.row, c.col));
+    if (nextTarget) {
+      state.focusedCell = { row: nextTarget.row, col: nextTarget.col };
     } else if (idx + 1 < coords.length) {
       state.focusedCell = { row: coords[idx + 1].row, col: coords[idx + 1].col };
     }
@@ -798,11 +781,6 @@ function advanceCursorInActiveWord(step) {
   }
 }
 
-/**
- * Checks all words in the grid to see if any newly completed word is solved!
- * Triggers "Yaaay!" audio + minimal sparkle animation for newly solved clues,
- * and triggers the Grand Victory Animation when all words are solved!
- */
 function evaluateSolvedWords(triggerCelebrations = true) {
   if (!state.layout) return;
   const newlySolved = [];
@@ -830,13 +808,11 @@ function evaluateSolvedWords(triggerCelebrations = true) {
       celebrateSolvedWord(w);
     }
 
-    // Check if the ENTIRE puzzle is now solved!
     if (state.solvedWordIds.size === state.layout.words.length) {
       setTimeout(() => {
         triggerPuzzleVictory();
       }, 550);
     } else {
-      // Auto-advance to the next unsolved word for smooth gameplay
       const nextUnsolved = state.layout.words.find((w) => !state.solvedWordIds.has(w.id));
       if (nextUnsolved) {
         selectWord(nextUnsolved.id, false);
@@ -846,10 +822,8 @@ function evaluateSolvedWords(triggerCelebrations = true) {
 }
 
 function celebrateSolvedWord(wordObj) {
-  // 1. Play "Yaaay!" voice + sparkle chime
   soundFx.playClueSolvedSound();
 
-  // 2. Pop-animate each cell of the solved word
   const coords = getWordCoordinates(wordObj);
   coords.forEach((c, idx) => {
     const cellEl = els.crosswordGrid.querySelector(
@@ -864,7 +838,6 @@ function celebrateSolvedWord(wordObj) {
     }
   });
 
-  // 3. Pop-animate the clue card & show floating "YAAAY! ⭐" + sparkles
   const clueCard = document.querySelector(`[data-clue-word-id="${wordObj.id}"]`);
   if (clueCard) {
     clueCard.classList.remove('just-solved-pop');
@@ -886,7 +859,7 @@ function triggerPuzzleVictory() {
 
   els.victorySubtitle.textContent = `You solved all ${state.layout.words.length} clues in "${state.currentPuzzleMeta.title}"!`;
   els.victoryWordPills.innerHTML = state.layout.words
-    .map((w) => `<span class="victory-word-pill">⭐ ${w.word}</span>`)
+    .map((w) => `<span class="victory-word-pill">${w.word}</span>`)
     .join('');
 
   els.victoryOverlay.classList.remove('hidden');
@@ -907,6 +880,7 @@ function fillWordSolution(wordObj, celebrate = true) {
   for (const c of coords) {
     if (state.userGrid[c.row]) {
       state.userGrid[c.row][c.col] = c.solution;
+      state.prefilledCells.add(`${c.row},${c.col}`);
     }
     state.wrongCells.delete(`${c.row},${c.col}`);
   }
@@ -938,14 +912,10 @@ function provideHintLetter() {
   if (targetRow == null || targetCol == null) return;
   const solution = state.layout.cells[targetRow]?.[targetCol]?.solution;
   if (solution) {
-    handleLetterInput(solution);
+    handleLetterInput(solution, true);
   }
 }
 
-/**
- * "Check Grid" button from Crosswords-for-Kids.com:
- * Highlights any wrong filled letters in red with a gentle buzz
- */
 function checkGridMistakes() {
   if (!state.layout) return;
   state.wrongCells.clear();
@@ -981,7 +951,6 @@ function updateBoardHighlights() {
     }
   }
 
-  // Update grid cells with safe bounds check
   const cellEls = els.crosswordGrid.querySelectorAll('.xw-cell.letter-cell');
   cellEls.forEach((cellEl) => {
     const r = Number(cellEl.dataset.row);
@@ -1007,7 +976,6 @@ function updateBoardHighlights() {
     cellEl.classList.toggle('cell-wrong', Boolean(isWrong));
   });
 
-  // Update clue cards & jump pills
   state.layout.words.forEach((w) => {
     const isSelected = w.id === state.activeWordId;
     const isSolved = state.solvedWordIds.has(w.id);
@@ -1016,19 +984,15 @@ function updateBoardHighlights() {
     if (card) {
       card.classList.toggle('selected', isSelected);
       card.classList.toggle('solved', isSolved);
-      const slotsEl = card.querySelector(`[data-slots-for="${w.id}"]`);
-      if (slotsEl) {
-        slotsEl.textContent = formatWordSlotsPreview(w);
-      }
     }
 
     const jumpPill = els.clueJumpBar?.querySelector(`[data-jump-word-id="${w.id}"]`);
     if (jumpPill) {
       jumpPill.classList.toggle('selected', isSelected);
       jumpPill.classList.toggle('solved', isSolved);
-      const iconEl = jumpPill.querySelector('.jump-icon');
-      if (iconEl) {
-        iconEl.textContent = isSolved ? '✓' : w.clueType === 'question' ? '❓' : '🖼️';
+      const numEl = jumpPill.querySelector('.jump-num');
+      if (numEl) {
+        numEl.textContent = isSolved ? `${w.number} ✓` : `${w.number}`;
       }
     }
   });
@@ -1040,47 +1004,17 @@ function updateSpotlightBanner() {
 
   els.spotlightNumber.textContent = String(activeWord.number);
   const isQuestion = activeWord.clueType === 'question';
-  els.spotlightTypeBadge.textContent = isQuestion
-    ? '❓ Question Clue'
-    : '🖼️ Picture Clue';
-  els.spotlightTypeBadge.classList.toggle('question-mode', isQuestion);
 
-  els.spotlightDirBadge.textContent = `${activeWord.direction.toUpperCase()} • ${
+  els.spotlightDirBadge.textContent = `${activeWord.direction.toUpperCase()} · ${
     activeWord.word.length
-  } Letters`;
+  } LETTERS`;
   els.spotlightQuestion.textContent = activeWord.questionClue;
 
-  if (activeWord.imageUrl && (!isQuestion || !activeWord._needsAiImage)) {
+  if (activeWord.imageUrl && !isQuestion) {
     els.spotlightThumbWrap.classList.remove('hidden');
     els.spotlightImg.src = activeWord.imageUrl;
   } else {
     els.spotlightThumbWrap.classList.add('hidden');
-  }
-
-  // Render interactive letter boxes in the spotlight banner for quick mobile glance & tap
-  if (els.spotlightWordSlots) {
-    const coords = getWordCoordinates(activeWord);
-    els.spotlightWordSlots.innerHTML = '';
-    coords.forEach((c) => {
-      const box = document.createElement('button');
-      box.type = 'button';
-      const ch = state.userGrid[c.row]?.[c.col] || '';
-      const isFocused =
-        state.focusedCell &&
-        state.focusedCell.row === c.row &&
-        state.focusedCell.col === c.col;
-      const isWrong = state.wrongCells.has(`${c.row},${c.col}`);
-      box.className = `spotlight-slot-box ${ch ? 'filled' : ''} ${isFocused ? 'focused' : ''} ${
-        isWrong ? 'wrong' : ''
-      }`;
-      box.textContent = ch || '_';
-      box.addEventListener('click', () => {
-        state.focusedCell = { row: c.row, col: c.col };
-        updateBoardHighlights();
-        updateSpotlightBanner();
-      });
-      els.spotlightWordSlots.appendChild(box);
-    });
   }
 }
 
@@ -1099,7 +1033,7 @@ function renderVirtualKeyboard() {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `vk-key ${key === '⌫' ? 'vk-wide' : ''}`;
-      btn.textContent = key === '⌫' ? '⌫ Erase' : key;
+      btn.textContent = key === '⌫' ? '⌫' : key;
       btn.dataset.vkKey = key;
       btn.addEventListener('click', () => {
         if (key === '⌫') {
@@ -1118,18 +1052,12 @@ function renderQuickPresetsStrip() {
   if (!els.quickPresetsStrip) return;
   els.quickPresetsStrip.innerHTML = '';
 
-  const label = document.createElement('span');
-  label.className = 'quick-presets-label';
-  label.textContent = 'Play Theme:';
-  els.quickPresetsStrip.appendChild(label);
-
   PRESET_PUZZLES.forEach((preset) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'quick-preset-pill';
     btn.dataset.quickPresetId = preset.id;
-    const icon = PRESET_ICONS[preset.id] || '🧩';
-    btn.textContent = `${icon} ${preset.theme}`;
+    btn.textContent = preset.theme;
     btn.addEventListener('click', () => {
       loadPuzzle(preset);
     });
@@ -1157,18 +1085,14 @@ function renderPresetGallery() {
     const previewImages = preset.items
       .filter((it) => it.imageUrl)
       .slice(0, 3)
-      .map((it) => `<img src="${it.imageUrl}" alt="${it.word}" loading="lazy" />`)
+      .map((it) => `<img src="${it.imageUrl}" alt="${preset.theme} clue preview" loading="lazy" />`)
       .join('');
 
-    const stars = '⭐'.repeat(preset.difficulty || 1);
-
     card.innerHTML = `
-      <span class="card-badge-ribbon">${preset.badge || 'PLAY'}</span>
       <div class="card-preview-strip">${previewImages}</div>
-      <h5 class="card-title">${preset.title}</h5>
-      <div class="card-infos">
-        <span>Words to find: ${preset.items.length}</span>
-        <span>Difficulty: ${stars}</span>
+      <div class="card-footer-meta">
+        <h5 class="card-title">${preset.title}</h5>
+        <span class="card-clue-count">${preset.items.length} clues</span>
       </div>
     `;
 
