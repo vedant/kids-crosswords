@@ -1,9 +1,10 @@
 /**
- * Sound Effects & Celebration Animations Engine
- * - Uses original Crosswords-for-Kids audio samples (/sounds/kids_yeah.mp3, kids_yeah2.mp3, wordFound.mp3, pop.mp3, click.mp3)
- * - Includes Web Audio API synth + SpeechSynthesis fallback so "Yaaay!" and musical chimes ALWAYS work
- * - Minimal sparkly pop + floating "YAAAY! ⭐" banner when solving a single clue
- * - Grand full-screen fireworks, confetti, dancing stars, trophy modal, and cheering fanfare when solving the entire puzzle
+ * Magic Crossword — Sound Effects & Celebration Animations Engine
+ * - Uses custom-synthesized & acoustically mastered Magic Crossword audio assets
+ *   (/sounds/keypress.mp3, select.mp3, hint.mp3, word-magic.mp3, solve-cheer.mp3, victory-fanfare.mp3)
+ * - Includes Web Audio API polyphonic chime synthesis so musical feedback is always crisp
+ * - Subtle starlight pop + floating celebration toast when solving a single clue
+ * - Full-screen constellation fireworks & confetti shower when completing a puzzle
  */
 
 class SoundAndFxManager {
@@ -18,12 +19,12 @@ class SoundAndFxManager {
     if (this.initialized || typeof window === 'undefined') return;
     this.initialized = true;
     const files = {
-      click: '/sounds/click.mp3',
-      pop: '/sounds/pop.mp3',
-      pop2: '/sounds/pop2.mp3',
-      wordFound: '/sounds/wordFound.mp3',
-      kidsYeah: '/sounds/kids_yeah.mp3',
-      kidsYeah2: '/sounds/kids_yeah2.mp3',
+      keypress: '/sounds/keypress.mp3',
+      select: '/sounds/select.mp3',
+      hint: '/sounds/hint.mp3',
+      wordMagic: '/sounds/word-magic.mp3',
+      solveCheer: '/sounds/solve-cheer.mp3',
+      victoryFanfare: '/sounds/victory-fanfare.mp3',
     };
     for (const [key, src] of Object.entries(files)) {
       try {
@@ -75,47 +76,43 @@ class SoundAndFxManager {
 
   playKeyClick() {
     if (this.muted) return;
-    this.playSample('pop', 0.45);
-    this.playTone(520, 0.04, 'sine', 0.06);
+    this.playSample('keypress', 0.48);
+    this.playTone(540, 0.035, 'sine', 0.05);
   }
 
   playSelectClue() {
     if (this.muted) return;
-    this.playSample('click', 0.5);
-    this.playTone(660, 0.05, 'triangle', 0.06);
+    this.playSample('select', 0.5);
+    this.playTone(660, 0.045, 'triangle', 0.05);
+  }
+
+  playHintChime() {
+    if (this.muted) return;
+    this.playSample('hint', 0.65);
   }
 
   playMistakeBuzz() {
     if (this.muted) return;
-    this.playTone(220, 0.14, 'sawtooth', 0.09);
-    setTimeout(() => this.playTone(180, 0.18, 'sawtooth', 0.09), 110);
+    this.playTone(220, 0.12, 'sawtooth', 0.08);
+    setTimeout(() => this.playTone(185, 0.16, 'sawtooth', 0.08), 105);
   }
 
-  /**
-   * "Yaaay!" sound effect + cheerful chime when a kid gets a clue right
-   */
   playClueSolvedSound() {
     if (this.muted) return;
-    // Play both the sparkle chime and the kids "Yaaay!" voice sample
-    this.playSample('wordFound', 0.75);
-    this.playSample('kidsYeah', 0.9);
+    this.playSample('wordMagic', 0.78);
+    this.playSample('solveCheer', 0.86);
 
-    // Also layer a bright major triad arpeggio via WebAudio so it sounds crisp on every device
-    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    const notes = [523.25, 659.25, 783.99, 1046.5];
     notes.forEach((freq, i) => {
-      setTimeout(() => this.playTone(freq, 0.14, 'triangle', 0.12), i * 65);
+      setTimeout(() => this.playTone(freq, 0.14, 'triangle', 0.1), i * 65);
     });
   }
 
-  /**
-   * Big celebratory fanfare + double cheering when the entire puzzle is solved
-   */
   playPuzzleVictorySound() {
     if (this.muted) return;
-    this.playSample('kidsYeah2', 1.0);
-    setTimeout(() => this.playSample('wordFound', 0.85), 250);
+    this.playSample('victoryFanfare', 0.95);
+    setTimeout(() => this.playSample('wordMagic', 0.8), 240);
 
-    // Grand victory brass/bell fanfare
     const melody = [
       { f: 523.25, t: 0, d: 0.15 },
       { f: 659.25, t: 130, d: 0.15 },
@@ -125,7 +122,7 @@ class SoundAndFxManager {
       { f: 1046.5, t: 830, d: 0.55 },
     ];
     melody.forEach((n) => {
-      setTimeout(() => this.playTone(n.f, n.d, 'triangle', 0.16), n.t);
+      setTimeout(() => this.playTone(n.f, n.d, 'triangle', 0.14), n.t);
     });
   }
 
@@ -153,18 +150,13 @@ class SoundAndFxManager {
 export const soundFx = new SoundAndFxManager();
 
 const CHEER_MESSAGES = [
-  'YAAAY! ⭐',
-  'AWESOME! 🎉',
-  'YOU GOT IT! 🌟',
-  'SUPER! ✨',
-  'YAAAY! 🎈',
-  'BRILLIANT! 🏆',
+  'SOLVED! ✨',
+  'BRILLIANT! ⭐',
+  'SPOT ON! 🌟',
+  'MAGIC! ✨',
+  'SPLENDID! 🏆',
 ];
 
-/**
- * Minimal, joyful animation when a single clue is solved:
- * - Floating "YAAAY! ⭐" pill badge + local burst of 14 star/confetti particles around the solved word/clue
- */
 export function triggerClueSolvedAnimation(anchorElement, wordText = '') {
   const container = document.getElementById('clue-cheer-layer') || document.body;
   const rect = anchorElement
@@ -184,32 +176,26 @@ export function triggerClueSolvedAnimation(anchorElement, wordText = '') {
   badge.style.top = `${Math.max(60, centerY - 10)}px`;
   container.appendChild(badge);
 
-  // Spawn 14 lightweight sparkle particles around the solved word
-  const colors = ['#ffd01e', '#29b1e9', '#e72878', '#f69626', '#2ecc71', '#ffffff'];
+  const colors = ['#f59e0b', '#6366f1', '#10b981', '#ec4899', '#38bdf8', '#fde047'];
   for (let i = 0; i < 14; i++) {
     const p = document.createElement('div');
     p.className = 'clue-sparkle-particle';
     const angle = (Math.PI * 2 * i) / 14 + (Math.random() - 0.5) * 0.3;
-    const dist = 45 + Math.random() * 55;
+    const dist = 42 + Math.random() * 52;
     const dx = Math.cos(angle) * dist;
-    const dy = Math.sin(angle) * dist - 15;
+    const dy = Math.sin(angle) * dist - 14;
     p.style.left = `${centerX}px`;
     p.style.top = `${centerY}px`;
     p.style.backgroundColor = colors[i % colors.length];
     p.style.setProperty('--dx', `${dx}px`);
     p.style.setProperty('--dy', `${dy}px`);
     container.appendChild(p);
-    setTimeout(() => p.remove(), 950);
+    setTimeout(() => p.remove(), 900);
   }
 
-  setTimeout(() => badge.remove(), 1450);
+  setTimeout(() => badge.remove(), 1350);
 }
 
-/**
- * Bigger full-screen celebration animation when the entire crossword puzzle is solved!
- * - Launches multi-wave canvas fireworks + confetti shower + floating balloons/stars
- * - Returns a cleanup function
- */
 export function startGrandVictoryAnimation(canvas) {
   if (!canvas) return () => {};
   const ctx = canvas.getContext('2d');
@@ -225,43 +211,41 @@ export function startGrandVictoryAnimation(canvas) {
   resize();
   window.addEventListener('resize', resize);
 
-  const colors = ['#ffd01e', '#29b1e9', '#e72878', '#f69626', '#2ecc71', '#a855f7', '#ffffff'];
+  const colors = ['#fbbf24', '#818cf8', '#34d399', '#f472b6', '#38bdf8', '#c084fc', '#ffffff'];
   const confetti = [];
   const fireworks = [];
 
-  // Create 130 confetti ribbons & stars
-  for (let i = 0; i < 130; i++) {
+  for (let i = 0; i < 110; i++) {
     confetti.push({
       x: Math.random() * canvas.width,
       y: Math.random() * -canvas.height,
-      vx: (Math.random() - 0.5) * 3,
-      vy: 2.5 + Math.random() * 4.5,
-      size: 8 + Math.random() * 10,
+      vx: (Math.random() - 0.5) * 2.6,
+      vy: 2.2 + Math.random() * 4.0,
+      size: 7 + Math.random() * 9,
       color: colors[i % colors.length],
       rot: Math.random() * Math.PI * 2,
-      vRot: (Math.random() - 0.5) * 0.14,
+      vRot: (Math.random() - 0.5) * 0.12,
       shape: i % 4 === 0 ? 'star' : 'rect',
     });
   }
 
   const spawnFireworkBurst = (x, y) => {
     const burstColor = colors[Math.floor(Math.random() * colors.length)];
-    for (let i = 0; i < 36; i++) {
-      const angle = (Math.PI * 2 * i) / 36;
-      const speed = 2 + Math.random() * 6.5;
+    for (let i = 0; i < 34; i++) {
+      const angle = (Math.PI * 2 * i) / 34;
+      const speed = 2 + Math.random() * 6.0;
       fireworks.push({
         x,
         y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         alpha: 1,
-        size: 3.5 + Math.random() * 3.5,
-        color: i % 3 === 0 ? '#ffd01e' : burstColor,
+        size: 3 + Math.random() * 3,
+        color: i % 3 === 0 ? '#fde047' : burstColor,
       });
     }
   };
 
-  // Launch initial firework bursts
   spawnFireworkBurst(canvas.width * 0.25, canvas.height * 0.3);
   spawnFireworkBurst(canvas.width * 0.75, canvas.height * 0.3);
   spawnFireworkBurst(canvas.width * 0.5, canvas.height * 0.22);
@@ -272,16 +256,15 @@ export function startGrandVictoryAnimation(canvas) {
     frame++;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (frame % 38 === 0) {
+    if (frame % 40 === 0) {
       spawnFireworkBurst(
         canvas.width * (0.15 + Math.random() * 0.7),
         canvas.height * (0.15 + Math.random() * 0.45)
       );
     }
 
-    // Draw confetti
     for (const c of confetti) {
-      c.x += c.vx + Math.sin(frame * 0.03 + c.size) * 0.7;
+      c.x += c.vx + Math.sin(frame * 0.03 + c.size) * 0.6;
       c.y += c.vy;
       c.rot += c.vRot;
       if (c.y > canvas.height + 20) {
@@ -301,12 +284,11 @@ export function startGrandVictoryAnimation(canvas) {
       ctx.restore();
     }
 
-    // Draw fireworks
     for (let i = fireworks.length - 1; i >= 0; i--) {
       const fw = fireworks[i];
       fw.x += fw.vx;
       fw.y += fw.vy;
-      fw.vy += 0.08; // gravity
+      fw.vy += 0.075;
       fw.alpha -= 0.016;
       if (fw.alpha <= 0) {
         fireworks.splice(i, 1);

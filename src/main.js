@@ -356,7 +356,7 @@ async function handleGenerateCustomTheme(theme) {
 
     const customPuzzle = {
       id: `custom-${Date.now()}`,
-      title: `${theme} Crossword`,
+      title: theme,
       theme,
       difficultyLevel: difficulty,
       targetClueCount: clueCount,
@@ -912,6 +912,7 @@ function provideHintLetter() {
   if (targetRow == null || targetCol == null) return;
   const solution = state.layout.cells[targetRow]?.[targetCol]?.solution;
   if (solution) {
+    soundFx.playHintChime();
     handleLetterInput(solution, true);
   }
 }

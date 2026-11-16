@@ -1,11 +1,15 @@
 import { test, expect } from '@playwright/test';
 
-test('renders decluttered board, toggles desktop keypad, switches presets, and celebrates victory', async ({ page }) => {
+test('renders Magic Crossword board, toggles desktop keypad, switches curated collections, and celebrates victory', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', (err) => pageErrors.push(err.message));
 
   await page.setViewportSize({ width: 1280, height: 860 });
   await page.goto('/');
+
+  await expect(page).toHaveTitle(/Magic Crossword/);
+  await expect(page.locator('.site-logo-title')).toContainText('Magic');
+  await expect(page.locator('.site-logo-title')).toContainText('Crossword');
 
   // Verify default difficulty is Elementary and Grandmaster option exists above College
   await expect(page.locator('#difficulty-select')).toHaveValue('elementary');
@@ -22,24 +26,23 @@ test('renders decluttered board, toggles desktop keypad, switches presets, and c
   await page.click('#btn-keyboard-toggle');
   await expect(page.locator('#virtual-keyboard')).toBeHidden();
 
-  await expect(page.locator('#active-puzzle-title')).toHaveText('Baby Animals Crossword');
+  await expect(page.locator('#active-puzzle-title')).toHaveText('Young Wildlife');
   await expect(page.locator('#total-word-count')).toHaveText('7');
   await expect(page.locator('.clue-card')).toHaveCount(7);
 
-  // Switch presets
+  // Switch curated collections
   await page.locator('[data-quick-preset-id="dinosaurs"]').click();
-  await expect(page.locator('#active-puzzle-title')).toHaveText('Dinosaur World Crossword');
+  await expect(page.locator('#active-puzzle-title')).toHaveText('Ancient Giants');
   await expect(page.locator('#total-word-count')).toHaveText('6');
 
   await page.locator('[data-preset-id="pirate-treasure"]').click();
-  await expect(page.locator('#active-puzzle-title')).toHaveText('Pirates & Treasure Crossword');
+  await expect(page.locator('#active-puzzle-title')).toHaveText('High Seas Voyage');
   await expect(page.locator('.clue-card')).toHaveCount(7);
 
   // Verify typing over a wrong tentative crossing letter overwrites cleanly instead of skipping & shifting
-  await page.click('#btn-first-letter-toggle'); // Turn off first-letter helper
+  await page.click('#btn-first-letter-toggle');
   await page.evaluate(() => {
     const st = window.__KIDS_XW__.getState();
-    // Find any intersecting cell (belongs to 2 words)
     let crossCell = null;
     for (let r = 0; r < st.layout.rows && !crossCell; r++) {
       for (let c = 0; c < st.layout.cols && !crossCell; c++) {
@@ -50,7 +53,6 @@ test('renders decluttered board, toggles desktop keypad, switches presets, and c
     }
     const [w1Id, w2Id] = crossCell.wordIds;
     const w1 = st.layout.words.find((w) => w.id === w1Id);
-    // Put a WRONG tentative guess across all of w1
     const dr1 = w1.direction === 'down' ? 1 : 0;
     const dc1 = w1.direction === 'across' ? 1 : 0;
     for (let i = 0; i < w1.word.length; i++) {
@@ -68,7 +70,6 @@ test('renders decluttered board, toggles desktop keypad, switches presets, and c
     return w2.word;
   });
 
-  // Type w2 sequentially via physical keyboard; must overwrite the wrong crossing letter and solve w2!
   for (const ch of w2Word) {
     await page.keyboard.press(ch);
   }
@@ -120,7 +121,7 @@ test('custom AI generation supports Grandmaster (above College) & Elementary wor
   await page.fill('#theme-input', 'Farm Animals and Nature');
   await page.click('#btn-generate-theme');
 
-  await expect(page.locator('#active-puzzle-title')).toHaveText('Farm Animals and Nature Crossword', { timeout: 30000 });
+  await expect(page.locator('#active-puzzle-title')).toHaveText('Farm Animals and Nature', { timeout: 30000 });
   const elemAudit = await page.evaluate(() => {
     const layout = window.__KIDS_XW__.getState().layout;
     const avgLen = layout.words.reduce((s, w) => s + w.word.length, 0) / layout.words.length;
@@ -138,12 +139,11 @@ test('custom AI generation supports Grandmaster (above College) & Elementary wor
   await page.fill('#theme-input', 'Quantum Field Theory and Cosmology');
   await page.click('#btn-generate-theme');
 
-  await expect(page.locator('#active-puzzle-title')).toHaveText('Quantum Field Theory and Cosmology Crossword', { timeout: 35000 });
+  await expect(page.locator('#active-puzzle-title')).toHaveText('Quantum Field Theory and Cosmology', { timeout: 35000 });
   await expect(page.locator('#active-theme-pill')).toContainText('Grandmaster');
 
   const gmAudit = await page.evaluate(() => {
     const layout = window.__KIDS_XW__.getState().layout;
-    // Verify 100% consistent intersections and single-component connectivity
     let allCrossingsConsistent = true;
     const adj = new Map(layout.words.map((w) => [w.id, new Set()]));
 
